@@ -199,7 +199,10 @@ public Q_SLOTS:
      * @param outputFileName The URL to save to / The document's URL.
      * @param saveACopy Default is false. If true, the file will be saved but isn’t opened afterwards. Besides no autosave version will be created
      * @return Whether we had success. */
-    bool saveFileAs(const QString &outputFileName, bool saveOverExistingFile = true, bool saveACopy = false);
+    // errorMessage requests noninteractive saving of a new copy; normal GUI calls leave it null.
+    // refuseOverwrite explicitly publishes a new file without replacement, preserving native Save As bookkeeping.
+    bool saveFileAs(const QString &outputFileName, bool saveOverExistingFile = true, bool saveACopy = false, QString *errorMessage = nullptr,
+                    bool refuseOverwrite = false);
 
     /** @brief Close currently opened document. Returns false if something went wrong (cannot save modifications, ...). */
     bool closeCurrentDocument(bool saveChanges = true, bool quit = false);

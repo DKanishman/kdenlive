@@ -10,6 +10,7 @@
 #include <QVariant>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 class AbstractTreeModel;
 
@@ -74,6 +75,9 @@ public:
        @param row is the index of the child to retrieve
     */
     std::shared_ptr<TreeItem> child(int row) const;
+
+    /** @brief Read-only child membership snapshot in sibling order. The model thread owns structural updates. */
+    std::vector<std::shared_ptr<TreeItem>> directChildren() const;
 
     /** @brief Returns a vector containing a pointer to all the leaves in the subtree rooted in this element */
     std::vector<std::shared_ptr<TreeItem>> getLeaves();

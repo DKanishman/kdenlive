@@ -1,0 +1,50 @@
+--- a/src/modules/sdl2/consumer_sdl2_audio.c
++++ b/src/modules/sdl2/consumer_sdl2_audio.c
+@@ -61,6 +61,7 @@
+     pthread_mutex_t video_mutex;
+     pthread_cond_t video_cond;
+     int out_channels;
++    SDL_AudioDeviceID audio_device;
+ 
+     pthread_cond_t refresh_cond;
+     pthread_mutex_t refresh_mutex;
+@@ -234,10 +235,18 @@
+         pthread_mutex_lock(&self->audio_mutex);
+         pthread_cond_broadcast(&self->audio_cond);
+         pthread_mutex_unlock(&self->audio_mutex);
++        // Closing our device must finish callbacks before consumer memory is freed,
++        // even while another consumer keeps SDL's audio subsystem initialized.
++        if (self->audio_device) {
++            SDL_CloseAudioDevice(self->audio_device);
++            self->audio_device = 0;
++        }
++        pthread_mutex_lock(&mlt_sdl_mutex);
+ #ifdef _WIN32
+         if (!self->no_quit_subsystem)
+ #endif
+             SDL_QuitSubSystem(SDL_INIT_AUDIO);
++        pthread_mutex_unlock(&mlt_sdl_mutex);
+     }
+ 
+     return 0;
+@@ -331,6 +340,12 @@
+     }
+ 
+     if (init_audio == 1) {
++        // A timed-out device may be replaced by this same consumer. Finish its
++        // callbacks before reusing buffers or losing ownership of the device.
++        if (self->audio_device) {
++            SDL_CloseAudioDevice(self->audio_device);
++            self->audio_device = 0;
++        }
+         SDL_AudioSpec request;
+         SDL_AudioSpec got;
+         SDL_AudioDeviceID dev;
+@@ -372,6 +387,7 @@
+                          SDL_GetCurrentAudioDriver(),
+                          got.channels,
+                          got.freq);
++            self->audio_device = dev;
+             SDL_PauseAudioDevice(dev, 0);
+             init_audio = 0;
+             self->out_channels = got.channels;

@@ -115,7 +115,7 @@ ecm_set_disabled_deprecation_versions(
 # Qt targets
 find_package(Qt${QT_MAJOR_VERSION}
     REQUIRED COMPONENTS
-    Core Widgets
+    Core Widgets Network
     Svg
     Quick
     QuickControls2

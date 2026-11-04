@@ -246,7 +246,11 @@ public:
     int getAllClipMarkers(int category) const;
 
     /** @brief Remove all clip markers using a category */
-    void removeMarkerCategories(QList<int> toRemove, const QMap<int, int> remapCategories);
+    bool removeMarkerCategories(QList<int> toRemove, const QMap<int, int> remapCategories);
+    /** Collect live recursive source/sequence marker models without opening timelines.
+     *  Reject missing producers or pending serialized-marker imports before category edits.
+     */
+    static bool markerModelsForCategoryChange(const std::shared_ptr<ProjectItemModel> &itemModel, QList<std::shared_ptr<MarkerListModel>> &models);
 
     /** @brief Returns a list of selected clip ids.
      *  @param allowSubClips: if true, will include subclip ids in the form: "master clip id/in/out"

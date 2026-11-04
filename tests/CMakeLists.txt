@@ -26,6 +26,7 @@ set(KdenliveTest_SOURCES
     markertest.cpp
     mixtest.cpp
     modeltest.cpp
+    mcptest.cpp
     movetest.cpp
     nestingtest.cpp
     projectpathstest.cpp
@@ -68,3 +69,10 @@ endforeach()
 
 target_sources(timelinepreviewtest PRIVATE timelinepreviewmonitor.cpp)
 target_sources(timelinepreviewtestb PRIVATE timelinepreviewmonitor.cpp)
+
+# The stdio connector has no third-party Python dependencies.
+find_package(Python3 3.10 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME mcp_proxy COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/test_kdenlive_mcp_proxy.py" -q)
+  set_tests_properties(mcp_proxy PROPERTIES TIMEOUT 30)
+endif()

@@ -1,0 +1,449 @@
+--- a/src/framework/mlt_playlist.h
++++ b/src/framework/mlt_playlist.h
+@@ -43,6 +43,29 @@
+     float fps;                /**< the frame rate of the clip */
+     int repeat;               /**< the number of times the clip is repeated */
+ } mlt_playlist_clip_info;
++
++#define MLT_PLAYLIST_ENTRY_INFO_API 1
++
++/** \brief Cached playlist entry information without a playlist-relative start.
++ *
++ * The producer and cut pointers are borrowed. Do not close them. They remain
++ * valid only while the playlist entry and referenced producers remain alive
++ * and unchanged. Use the application's normal synchronization to prevent
++ * concurrent playlist edits, autoclose, and producer destruction.
++ *
++ * The cached frame_count includes repeat. Sum it in a suitably wide checked
++ * local accumulator when playlist-relative starts are needed.
++ */
++typedef struct
++{
++    mlt_producer
++        producer;     /**< the producer, or parent producer of a cut; can be NULL after autoclose */
++    mlt_producer cut; /**< the entry's cut producer; can be NULL after autoclose */
++    mlt_position frame_in;    /**< the cached in point */
++    mlt_position frame_out;   /**< the cached out point */
++    mlt_position frame_count; /**< the cached duration including repeats */
++    int repeat;               /**< the cached number of repetitions */
++} mlt_playlist_entry_info;
+ 
+ /** Playlist Entry
+ */
+@@ -104,6 +127,10 @@
+ MLT_EXPORT int mlt_playlist_get_clip_info(mlt_playlist self,
+                                           mlt_playlist_clip_info *info,
+                                           int index);
++MLT_EXPORT int mlt_playlist_get_entries_info(mlt_playlist self,
++                                             int first,
++                                             int count,
++                                             mlt_playlist_entry_info *entries);
+ MLT_EXPORT int mlt_playlist_insert(
+     mlt_playlist self, mlt_producer producer, int where, mlt_position in, mlt_position out);
+ MLT_EXPORT int mlt_playlist_remove(mlt_playlist self, int where);
+--- a/src/framework/mlt_playlist.c
++++ b/src/framework/mlt_playlist.c
+@@ -695,6 +695,59 @@
+     }
+ 
+     return error;
++}
++
++/** Read a range of cached playlist entries without calculating prefix starts.
++ *
++ * This performs work linear in count, not in first. It allocates no output
++ * buffers or containers, changes no reference counts, and performs no seek,
++ * frame retrieval, refresh or event operation. Parent-producer lookup uses the
++ * existing mlt_producer_cut_parent() semantics; its existing property getters
++ * can canonicalize malformed internal property values.
++ *
++ * This does not refresh cached points from edited cuts. It returns the same
++ * cached points and repeat values used by mlt_playlist_get_clip_info(). Entries
++ * whose producer has been closed by autoclose still return their cached timing
++ * and repeat values with NULL producer and cut pointers.
++ *
++ * The caller must provide room for count records and use its normal native
++ * synchronization to prevent concurrent edits, autoclose or destruction. The
++ * function does not acquire a playlist container lock or retain any producer.
++ *
++ * \public \memberof mlt_playlist_s
++ * \param self a non-NULL playlist
++ * \param first the first entry index, in the inclusive range 0..playlist count
++ * \param count the number of entries, in the range 0..playlist count-first
++ * \param[out] entries caller-owned output array; may be NULL only when count is 0
++ * \return 0 on success, or 1 for an invalid argument or unavailable entry;
++ * all output records are left untouched on error
++ */
++
++int mlt_playlist_get_entries_info(mlt_playlist self,
++                                  int first,
++                                  int count,
++                                  mlt_playlist_entry_info *entries)
++{
++    if (!self || first < 0 || count < 0 || first > self->count || count > self->count - first
++        || (count > 0 && (!entries || !self->list)))
++        return 1;
++
++    // Validate the entire range before writing the caller's first record.
++    for (int i = 0; i < count; ++i)
++        if (!self->list[first + i])
++            return 1;
++
++    for (int i = 0; i < count; ++i) {
++        const playlist_entry *entry = self->list[first + i];
++        mlt_playlist_entry_info *info = &entries[i];
++        info->producer = mlt_producer_cut_parent(entry->producer);
++        info->cut = entry->producer;
++        info->frame_in = entry->frame_in;
++        info->frame_out = entry->frame_out;
++        info->frame_count = entry->frame_count;
++        info->repeat = entry->repeat;
++    }
++    return 0;
+ }
+ 
+ /** Get number of clips in the playlist.
+--- a/src/framework/mlt.vers
++++ b/src/framework/mlt.vers
+@@ -708,5 +708,6 @@
+ 
+ MLT_7.44.0 {
+   global:
++    mlt_playlist_get_entries_info;
+     mlt_properties_revision;
+ } MLT_7.42.0;
+--- a/src/tests/test_playlist/test_playlist.cpp
++++ b/src/tests/test_playlist/test_playlist.cpp
+@@ -16,6 +16,13 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <algorithm>
++#include <array>
++#include <climits>
++#include <limits>
++#include <memory>
++#include <utility>
++#include <vector>
+ #include <QtTest>
+ 
+ #include <mlt++/Mlt.h>
+@@ -31,6 +38,12 @@
+         : profile("dv_pal")
+     {
+         Factory::init();
++    }
++
++private:
++    static void onBulkEntryInfoEvent(mlt_properties, void *data, mlt_event_data)
++    {
++        ++*static_cast<int *>(data);
+     }
+ 
+ private Q_SLOTS:
+@@ -375,6 +388,289 @@
+         QCOMPARE(pl.count(), 2);
+         QCOMPARE(pl.get_playtime(), 15);
+     }
++    void BulkEntryInfoMatchesLegacyAndSlices()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        Producer q(profile, "color", "blue");
++        QVERIFY(pl.is_valid());
++        QVERIFY(p.is_valid());
++        QVERIFY(q.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        q.set("length", 100);
++        q.set_in_and_out(0, 99);
++        QCOMPARE(pl.append(p, 5, 12), 0);
++        QCOMPARE(pl.blank(3), 0);
++        QCOMPARE(pl.append(p, 30, 44), 0);
++        QCOMPARE(pl.repeat(2, 3), 0);
++        QCOMPARE(pl.append(q, 0, 0), 0);
++        QCOMPARE(pl.append(p, 60, 64), 0);
++        QCOMPARE(pl.repeat(4, 2), 0);
++        QCOMPARE(pl.count(), 5);
++
++        std::array<mlt_playlist_entry_info, 5> entries{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, entries.size(), entries.data()),
++                 0);
++        qint64 start = 0;
++        for (int i = 0; i < pl.count(); ++i) {
++            mlt_playlist_clip_info legacy;
++            QCOMPARE(mlt_playlist_get_clip_info(pl.get_playlist(), &legacy, i), 0);
++            const auto &entry = entries[i];
++            QCOMPARE(entry.producer, legacy.producer);
++            QCOMPARE(entry.cut, legacy.cut);
++            QCOMPARE(entry.frame_in, legacy.frame_in);
++            QCOMPARE(entry.frame_out, legacy.frame_out);
++            QCOMPARE(entry.frame_count, legacy.frame_count);
++            QCOMPARE(entry.repeat, legacy.repeat);
++            QCOMPARE(start, qint64(legacy.start));
++            QVERIFY(entry.frame_count >= 0);
++            QVERIFY(qint64(entry.frame_count) <= std::numeric_limits<qint64>::max() - start);
++            start += qint64(entry.frame_count);
++        }
++        QCOMPARE(start, qint64(pl.get_playtime()));
++        QCOMPARE(entries[0].producer, entries[2].producer);
++        QCOMPARE(entries[0].producer, entries[4].producer);
++        QVERIFY(entries[0].cut != entries[2].cut);
++        QCOMPARE(entries[2].frame_count, mlt_position(45));
++        QCOMPARE(entries[2].repeat, 3);
++        QCOMPARE(entries[4].frame_count, mlt_position(10));
++        QCOMPARE(entries[4].repeat, 2);
++        QVERIFY(pl.is_blank(1));
++
++        std::array<mlt_playlist_entry_info, 2> slice{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 2, slice.size(), slice.data()), 0);
++        for (int i = 0; i < int(slice.size()); ++i) {
++            QCOMPARE(slice[i].producer, entries[i + 2].producer);
++            QCOMPARE(slice[i].cut, entries[i + 2].cut);
++            QCOMPARE(slice[i].frame_in, entries[i + 2].frame_in);
++            QCOMPARE(slice[i].frame_out, entries[i + 2].frame_out);
++            QCOMPARE(slice[i].frame_count, entries[i + 2].frame_count);
++            QCOMPARE(slice[i].repeat, entries[i + 2].repeat);
++        }
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 0, nullptr), 0);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), pl.count(), 0, nullptr), 0);
++        Playlist empty(profile);
++        QCOMPARE(mlt_playlist_get_entries_info(empty.get_playlist(), 0, 0, nullptr), 0);
++    }
++
++    void BulkEntryInfoInvalidDoesNotWrite()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        QCOMPARE(pl.append(p, 0, 9), 0);
++        QCOMPARE(pl.blank(4), 0);
++        std::array<mlt_playlist_entry_info, 3> entries{};
++        for (auto &entry : entries) {
++            entry.producer = p.get_producer();
++            entry.cut = p.get_producer();
++            entry.frame_in = 91;
++            entry.frame_out = 97;
++            entry.frame_count = 21;
++            entry.repeat = 3;
++        }
++        const QByteArray original(reinterpret_cast<const char *>(entries.data()), sizeof(entries));
++        const std::array<std::pair<int, int>, 8> invalid{{{-1, 1},
++                                                          {0, -1},
++                                                          {pl.count() + 1, 0},
++                                                          {pl.count(), 1},
++                                                          {1, pl.count()},
++                                                          {INT_MAX, 1},
++                                                          {1, INT_MAX},
++                                                          {INT_MAX, INT_MAX}}};
++        for (const auto &range : invalid) {
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(),
++                                                   range.first,
++                                                   range.second,
++                                                   entries.data()),
++                     1);
++            QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                     original);
++        }
++        QCOMPARE(mlt_playlist_get_entries_info(nullptr, 0, 1, entries.data()), 1);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 1, nullptr), 1);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 1, 0, entries.data()), 0);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++
++        // An unavailable later row must not leave an earlier output half-filled.
++        // Restore the test fixture before assertions can return from the slot.
++        auto *saved = pl.get_playlist()->list[1];
++        pl.get_playlist()->list[1] = nullptr;
++        const int result = mlt_playlist_get_entries_info(pl.get_playlist(), 0, 2, entries.data());
++        pl.get_playlist()->list[1] = saved;
++        QCOMPARE(result, 1);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++    }
++
++    void BulkEntryInfoDoesNotChangePlaybackOrEvents()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        QCOMPARE(pl.append(p, 0, 9), 0);
++        QCOMPARE(pl.blank(4), 0);
++        QCOMPARE(pl.append(p, 20, 29), 0);
++        QCOMPARE(pl.repeat(2, 4), 0);
++        auto *cut = mlt_playlist_get_clip(pl.get_playlist(), 0);
++        QVERIFY(cut != nullptr);
++        // A read must keep cached entry timing until a normal native edit refreshes it.
++        mlt_producer_set_in_and_out(cut, 3, 5);
++        const std::array<mlt_producer, 4> producers{pl.get_producer(),
++                                                    p.get_producer(),
++                                                    cut,
++                                                    mlt_playlist_get_clip(pl.get_playlist(), 1)};
++        for (int i = 0; i < int(producers.size()); ++i) {
++            QVERIFY(producers[i] != nullptr);
++            mlt_producer_seek(producers[i], i + 1);
++            mlt_producer_set_speed(producers[i], 0.25 * (i + 1));
++        }
++        int eventCount = 0;
++        std::vector<std::unique_ptr<Event>> listeners;
++        for (auto *producer : producers) {
++            auto *event = mlt_events_listen(MLT_PRODUCER_PROPERTIES(producer),
++                                            &eventCount,
++                                            "property-changed",
++                                            onBulkEntryInfoEvent);
++            QVERIFY(event != nullptr);
++            listeners.emplace_back(new Event(event));
++        }
++        auto *next = mlt_events_listen(pl.get_properties(),
++                                       &eventCount,
++                                       "playlist-next",
++                                       onBulkEntryInfoEvent);
++        QVERIFY(next != nullptr);
++        listeners.emplace_back(new Event(next));
++        struct Playback
++        {
++            mlt_position position;
++            mlt_position frame;
++            double speed;
++            unsigned int revision;
++            int refs;
++        };
++        std::array<Playback, 4> before{};
++        for (int i = 0; i < int(producers.size()); ++i) {
++            auto *producer = producers[i];
++            auto *properties = MLT_PRODUCER_PROPERTIES(producer);
++            before[i] = {mlt_producer_position(producer),
++                         mlt_producer_frame(producer),
++                         mlt_producer_get_speed(producer),
++                         mlt_properties_revision(properties),
++                         mlt_properties_ref_count(properties)};
++        }
++        const int count = pl.count();
++        const int length = pl.get_playtime();
++        eventCount = 0;
++        std::array<mlt_playlist_entry_info, 3> entries{};
++        for (int i = 0; i < 256; ++i)
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(),
++                                                   0,
++                                                   entries.size(),
++                                                   entries.data()),
++                     0);
++        QCOMPARE(eventCount, 0);
++        QCOMPARE(pl.count(), count);
++        QCOMPARE(pl.get_playtime(), length);
++        QCOMPARE(entries[0].frame_in, mlt_position(0));
++        QCOMPARE(entries[0].frame_out, mlt_position(9));
++        QCOMPARE(entries[0].frame_count, mlt_position(10));
++        QCOMPARE(mlt_producer_get_in(cut), mlt_position(3));
++        QCOMPARE(mlt_producer_get_out(cut), mlt_position(5));
++        for (int i = 0; i < int(producers.size()); ++i) {
++            auto *producer = producers[i];
++            auto *properties = MLT_PRODUCER_PROPERTIES(producer);
++            QCOMPARE(mlt_producer_position(producer), before[i].position);
++            QCOMPARE(mlt_producer_frame(producer), before[i].frame);
++            QCOMPARE(mlt_producer_get_speed(producer), before[i].speed);
++            QCOMPARE(mlt_properties_revision(properties), before[i].revision);
++            QCOMPARE(mlt_properties_ref_count(properties), before[i].refs);
++        }
++    }
++
++    void BulkEntryInfoEnumeratesMoreThan512Entries()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        constexpr int count = 1025;
++        qint64 expectedDuration = 0;
++        // A direct native fixture, with setup outside the getter under test.
++        for (int i = 0; i < count; ++i) {
++            if (i % 3 == 0)
++                QCOMPARE(pl.blank(2), 0);
++            else
++                QCOMPARE(pl.append(p, i % 17, i % 17 + 4), 0);
++            if (i % 23 == 0)
++                QCOMPARE(pl.repeat(i, 2), 0);
++            expectedDuration += (i % 3 == 0 ? 3 : 5) * (i % 23 == 0 ? 2 : 1);
++        }
++        std::array<mlt_playlist_entry_info, 256> entries{};
++        qint64 start = 0;
++        int seen = 0;
++        int batches = 0;
++        while (seen < count) {
++            const int rows = std::min(int(entries.size()), count - seen);
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), seen, rows, entries.data()),
++                     0);
++            ++batches;
++            for (int j = 0; j < rows; ++j) {
++                const int i = seen + j;
++                const auto &entry = entries[j];
++                QCOMPARE(entry.frame_in, mlt_position(i % 3 == 0 ? 0 : i % 17));
++                QCOMPARE(entry.frame_count,
++                         mlt_position((i % 3 == 0 ? 3 : 5) * (i % 23 == 0 ? 2 : 1)));
++                QCOMPARE(entry.repeat, i % 23 == 0 ? 2 : 1);
++                if (i == 0 || i == 512 || i == count - 1) {
++                    mlt_playlist_clip_info legacy;
++                    QCOMPARE(mlt_playlist_get_clip_info(pl.get_playlist(), &legacy, i), 0);
++                    QCOMPARE(start, qint64(legacy.start));
++                    QCOMPARE(entry.cut, legacy.cut);
++                    QCOMPARE(entry.producer, legacy.producer);
++                }
++                QVERIFY(entry.frame_count >= 0);
++                QVERIFY(qint64(entry.frame_count) <= std::numeric_limits<qint64>::max() - start);
++                start += qint64(entry.frame_count);
++            }
++            seen += rows;
++        }
++        QCOMPARE(seen, count);
++        QCOMPARE(batches, 5);
++        QCOMPARE(start, expectedDuration);
++        QCOMPARE(start, qint64(pl.get_playtime()));
++    }
++    void BulkEntryInfoPreservesAutoclosedTiming()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        QCOMPARE(pl.append(p, 5, 14), 0);
++        QCOMPARE(pl.repeat(0, 2), 0);
++        QCOMPARE(pl.append(p, 20, 24), 0);
++        QCOMPARE(pl.append(p, 30, 34), 0);
++        pl.set("autoclose", 1);
++        QCOMPARE(pl.seek(25), 0);
++        // Only fixture setup retrieves a frame to exercise real native autoclose.
++        std::unique_ptr<Frame> frame(pl.get_frame());
++        QVERIFY(frame != nullptr);
++        QCOMPARE(mlt_playlist_get_clip(pl.get_playlist(), 0), nullptr);
++        mlt_playlist_entry_info entry{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 1, &entry), 0);
++        QCOMPARE(entry.producer, nullptr);
++        QCOMPARE(entry.cut, nullptr);
++        QCOMPARE(entry.frame_in, mlt_position(5));
++        QCOMPARE(entry.frame_out, mlt_position(14));
++        QCOMPARE(entry.frame_count, mlt_position(20));
++        QCOMPARE(entry.repeat, 2);
++    }
+ };
+ 
+ QTEST_APPLESS_MAIN(TestPlaylist)
+--- a/NEWS
++++ b/NEWS
+@@ -2,6 +2,13 @@
+ -----------------
+ 
+ Version 7.43.0
++
++Framework
++  - Added mlt_playlist_get_entries_info() to read caller-buffered ranges of cached
++    playlist entry producer/cut pointers, ranges, duration and repeat count
++    without computing each entry's playlist-relative start. The caller retains
++    normal native synchronization and accumulates starts locally. The additive
++    MLT_PLAYLIST_ENTRY_INFO_API capability macro identifies this API.
+ 
+ Modules
+   - Fixed the `qtext` typewriter effect delaying its start after the text is

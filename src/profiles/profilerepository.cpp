@@ -10,7 +10,11 @@
 #include <KLocalizedString>
 #include <KMessageBox>
 #include <QDir>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <QStandardPaths>
+#include <QTemporaryFile>
+#include <QTextStream>
 #include <algorithm>
 #include <mlt++/MltProfile.h>
 #include <set>
@@ -40,13 +44,13 @@ void ProfileRepository::refresh()
     // Build a spec string from a profile's key dimensions for deduplication
     auto make_spec = [](const std::unique_ptr<ProfileModel> &p) -> QString {
         const QStringList properties = {QString::number(p->width()),
-            QString::number(p->height()),
-            QString::number(p->frame_rate_num()),
-            QString::number(p->frame_rate_den()),
-            QString::number(p->progressive() ? 1 : 0),
-            QString::number(p->sample_aspect_num()),
-            QString::number(p->sample_aspect_den()),
-            QString::number(p->colorspace())};
+                                        QString::number(p->height()),
+                                        QString::number(p->frame_rate_num()),
+                                        QString::number(p->frame_rate_den()),
+                                        QString::number(p->progressive() ? 1 : 0),
+                                        QString::number(p->sample_aspect_num()),
+                                        QString::number(p->sample_aspect_den()),
+                                        QString::number(p->colorspace())};
         return properties.join(QLatin1Char('|'));
     };
 
@@ -181,31 +185,29 @@ QString ProfileRepository::findMatchingProfile(ProfileInfo *profile) const
     return QString();
 }
 
-const QString ProfileRepository::saveProfile(ProfileInfo *profile, QString profilePath)
+const QString ProfileRepository::saveProfile(ProfileInfo *profile, QString profilePath, QString *errorMessage, bool refuseOverwrite)
 {
-    bool newProfile = false;
-    if (profilePath.isEmpty()) {
-        int i = 0;
-        QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/profiles/"));
-        if (!dir.exists()) {
-            dir.mkpath(QStringLiteral("."));
-        }
-        QString customName = QStringLiteral("customprofile");
-        profilePath = dir.absoluteFilePath(customName + QString::number(i));
-        while (QFile::exists(profilePath)) {
-            ++i;
-            profilePath = dir.absoluteFilePath(customName + QString::number(i));
-        }
-    }
-    QFile file(profilePath);
-    if (file.exists()) {
-        newProfile = false;
-    }
-    if (!file.open(QIODevice::WriteOnly)) {
-        KMessageBox::error(nullptr, i18n("Cannot open file %1", profilePath));
+    if (errorMessage) errorMessage->clear();
+    const auto reportError = [errorMessage](const QString &message, const QString &detail = QString()) {
+        const QString full = detail.isEmpty() ? message : message + QStringLiteral(": ") + detail;
+        if (errorMessage)
+            *errorMessage = full;
+        else
+            KMessageBox::error(nullptr, full);
         return QString();
+    };
+    if (!profile || !profile->is_valid()) return reportError(i18n("Cannot save an invalid profile."));
+    if (profilePath.isEmpty()) {
+        QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/profiles/"));
+        if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) return reportError(i18n("Cannot create profile directory %1", dir.absolutePath()));
+        int i = 0;
+        do {
+            profilePath = dir.absoluteFilePath(QStringLiteral("customprofile") + QString::number(i++));
+        } while (QFileInfo::exists(profilePath));
     }
-    QTextStream out(&file);
+    // Read every caller-owned field before invalidating the repository's old cached object.
+    QString serialized;
+    QTextStream out(&serialized);
     out << "description=" << profile->description() << '\n'
         << "frame_rate_num=" << profile->frame_rate_num() << '\n'
         << "frame_rate_den=" << profile->frame_rate_den() << '\n'
@@ -218,16 +220,31 @@ const QString ProfileRepository::saveProfile(ProfileInfo *profile, QString profi
         << "display_aspect_num=" << profile->display_aspect_num() << '\n'
         << "display_aspect_den=" << profile->display_aspect_den() << '\n'
         << "colorspace=" << profile->colorspace() << '\n';
-    if (file.error() != QFile::NoError) {
-        KMessageBox::error(nullptr, i18n("Cannot write to file %1", profilePath));
-        profilePath.clear();
-    }
-    file.close();
-    if (!newProfile) {
-        // We edited an existing profile, remove it to trigger a reload
-        if (m_profiles.count(profilePath) > 0) {
-            m_profiles.erase(profilePath);
+    const QByteArray data = serialized.toUtf8();
+    if (refuseOverwrite) {
+        QTemporaryFile temporary(QFileInfo(profilePath).dir().absoluteFilePath(QStringLiteral(".kdenlive-profile-XXXXXX")));
+        if (!temporary.open()) return reportError(i18n("Cannot open file %1", profilePath), temporary.errorString());
+        if (temporary.write(data) != data.size() || !temporary.flush())
+            return reportError(i18n("Cannot write to file %1", profilePath), temporary.errorString());
+        temporary.close();
+        // QTemporaryFile keeps its native handle after close(). Rename through its own engine,
+        // which closes that handle for publication on Windows and still refuses an existing target.
+        if (!temporary.rename(profilePath)) return reportError(i18n("Cannot publish new profile %1", profilePath), temporary.errorString());
+        temporary.setAutoRemove(false);
+    } else {
+        QSaveFile file(profilePath);
+        file.setDirectWriteFallback(false);
+        if (!file.open(QIODevice::WriteOnly)) return reportError(i18n("Cannot open file %1", profilePath), file.errorString());
+        if (file.write(data) != data.size()) {
+            const QString error = file.errorString();
+            file.cancelWriting();
+            return reportError(i18n("Cannot write to file %1", profilePath), error);
         }
+        if (!file.commit()) return reportError(i18n("Cannot write to file %1", profilePath), file.errorString());
+    }
+    {
+        QWriteLocker locker(&m_mutex);
+        m_profiles.erase(profilePath);
     }
     refresh();
     return profilePath;
@@ -242,8 +259,8 @@ bool ProfileRepository::deleteProfile(const QString &path)
     if (!success) {
         qCDebug(KDENLIVE_LOG) << "//// Cannot delete profile " << path << ", does not seem to be custom one";
     } else {
-        if (m_profiles.count(path) > 0) {
-            // remove the stored profile
+        {
+            QWriteLocker locker(&m_mutex);
             m_profiles.erase(path);
         }
         refresh();

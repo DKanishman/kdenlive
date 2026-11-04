@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-04",
+  "status": "paused_incomplete",
+  "completeEditorCoverageVerified": false,
+  "lastFullCtest": {
+    "suitesPassed": 6,
+    "suitesTotal": 8,
+    "mcpCasesPassed": 152,
+    "mcpCasesTotal": 155,
+    "mcpAssertionsPassed": 39765,
+    "mcpAssertionsTotal": 39768,
+    "status": "failed; subsequent corrections not rerun"
+  },
+  "connectorAfterCorrection": {
+    "cases": 25,
+    "platformSkips": 1,
+    "interpreters": [
+      "Python 3.12",
+      "Python 3.14"
+    ],
+    "status": "passed"
+  },
+  "dependencyNativeSuites": {
+    "passed": 5,
+    "total": 5
+  },
+  "playlistProbe": {
+    "exactResultPairs": 20,
+    "largestPlaylistEntries": 8192,
+    "status": "passed"
+  },
+  "liveEarlierBuild": {
+    "phases": [
+      "catalogs",
+      "profile",
+      "timeline",
+      "effects",
+      "lifecycle",
+      "sequences",
+      "dialogs",
+      "state"
+    ],
+    "status": "passed",
+    "currentFinalSourceVerified": false
+  },
+  "latestCompile": "build32 completed; subsequent roto easing guard pending rebuild",
+  "dependencyPatches": {
+    "mlt-openfx-factory-export.patch": "8bd03d57bb7e0fb21a84e7646220edcaed5d206d5b30393c69e6d984ae826a08",
+    "mlt-playlist-entry-info.patch": "38dbea7e125425fab4e4d8de23f6c1b10c8c4d6ef17d14422896f163870d7a02",
+    "mlt-sdl2-audio-device-lifetime.patch": "5cb0965cc1adef1f90e3e107020deadee2f41d5bd12a3146b0d7b3c3a3b805a4",
+    "mlt-xml-windows-getcwd.patch": "0f60a19dbc48a696e080c04d8259d956d61c48f0e4bb51a6ac6088c19240435c"
+  },
+  "stoppedOnUserRequest": true
+}

@@ -47,6 +47,15 @@ ClipLoadTask::ClipLoadTask(const ObjectId &owner, const QDomElement &xml, bool t
 {
     m_description = m_thumbOnly ? i18n("Video thumbs") : i18n("Loading clip");
     if (!m_xml.isNull()) {
+        // Keep the import policy on the native bin object for subsequent reloads
+        // and undo/redo without persisting an automation flag in project media.
+        const char *policy = "_kdenlive_no_transcode_dialog";
+        if (object && m_xml.attribute(QStringLiteral("noTranscodeDialog")) == QLatin1String("1")) {
+            object->setProperty(policy, true);
+        }
+        if (object && object->property(policy).toBool()) {
+            m_xml.setAttribute(QStringLiteral("noTranscodeDialog"), QStringLiteral("1"));
+        }
         if (m_xml.hasAttribute(QStringLiteral("sequenceUuid"))) {
             m_sequenceUuid = QUuid(m_xml.attribute(QStringLiteral("sequenceUuid")));
         }
@@ -323,6 +332,7 @@ void ClipLoadTask::run()
     }
     Q_EMIT pCore->projectItemModel()->resetPlayOrLoopZone(QString::number(m_owner.itemId));
     QString resource = Xml::getXmlProperty(m_xml, QStringLiteral("resource"));
+    const bool suppressTranscodeDialog = m_xml.attribute(QStringLiteral("noTranscodeDialog")) == QLatin1String("1");
     int duration = 0;
     ClipType::ProducerType type = static_cast<ClipType::ProducerType>(m_xml.attribute(QStringLiteral("type")).toInt());
     QString service = Xml::getXmlProperty(m_xml, QStringLiteral("mlt_service"));
@@ -747,9 +757,13 @@ void ClipLoadTask::run()
                 }
             }
             info.type = type;
-            QMetaObject::invokeMethod(pCore->bin(), "requestTranscoding", Qt::QueuedConnection, Q_ARG(QString, QString::number(m_owner.itemId)),
-                                      Q_ARG(TranscodeSeek::TranscodeInfo, info), Q_ARG(bool, checkProfile), Q_ARG(QString, QString()),
-                                      Q_ARG(QString, i18n("File <b>%1</b> is not seekable.", QFileInfo(resource).fileName())));
+            if (suppressTranscodeDialog) {
+                producer->set("_wait_for_transcode", 1);
+            } else {
+                QMetaObject::invokeMethod(pCore->bin(), "requestTranscoding", Qt::QueuedConnection, Q_ARG(QString, QString::number(m_owner.itemId)),
+                                          Q_ARG(TranscodeSeek::TranscodeInfo, info), Q_ARG(bool, checkProfile), Q_ARG(QString, QString()),
+                                          Q_ARG(QString, i18n("File <b>%1</b> is not seekable.", QFileInfo(resource).fileName())));
+            }
         }
 
         // Check for variable frame rate
@@ -778,9 +792,11 @@ void ClipLoadTask::run()
             }
             info.type = type;
             producer->set("_wait_for_transcode", 1);
-            QMetaObject::invokeMethod(pCore->bin(), "requestTranscoding", Qt::QueuedConnection, Q_ARG(QString, QString::number(m_owner.itemId)),
-                                      Q_ARG(TranscodeSeek::TranscodeInfo, info), Q_ARG(bool, checkProfile), Q_ARG(QString, adjustedFpsString),
-                                      Q_ARG(QString, i18n("File <b>%1</b> has a variable frame rate.", QFileInfo(resource).fileName())));
+            if (!suppressTranscodeDialog) {
+                QMetaObject::invokeMethod(pCore->bin(), "requestTranscoding", Qt::QueuedConnection, Q_ARG(QString, QString::number(m_owner.itemId)),
+                                          Q_ARG(TranscodeSeek::TranscodeInfo, info), Q_ARG(bool, checkProfile), Q_ARG(QString, adjustedFpsString),
+                                          Q_ARG(QString, i18n("File <b>%1</b> has a variable frame rate.", QFileInfo(resource).fileName())));
+            }
         }
 
         if (fps <= 0 && !m_isCanceled.loadAcquire()) {

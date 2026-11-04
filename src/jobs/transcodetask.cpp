@@ -15,13 +15,17 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "mainwindow.h"
 
 #include <QProcess>
+#include <QRegularExpression>
+#include <QScopeGuard>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QThread>
+#include <mlt++/MltProducer.h>
 
 #include <KLocalizedString>
 
 TranscodeTask::TranscodeTask(const ObjectId &owner, const QString &suffix, const QString &preParams, const QString &params, TranscodeSeek::TranscodeInfo info,
-                             int in, int out, bool replaceProducer, QObject *object, bool checkProfile)
+                             int in, int out, bool replaceProducer, QObject *object, bool checkProfile, const QString &outputPath, bool addToProject)
     : AbstractTask(owner, AbstractTask::TRANSCODEJOB, object)
     , m_jobDuration(0)
     , m_isFfmpegJob(true)
@@ -33,8 +37,18 @@ TranscodeTask::TranscodeTask(const ObjectId &owner, const QString &suffix, const
     , m_outPoint(out)
     , m_checkProfile(checkProfile)
     , m_transcodeInfo(info)
+    , m_requestedOutputPath(outputPath)
+    , m_addToProject(addToProject)
+    , m_projectFps(pCore->getCurrentFps())
 {
     m_description = i18n("Transcoding");
+}
+
+TranscodeTask::~TranscodeTask()
+{
+    // TaskManager may remove a queued QRunnable before run() is entered.
+    // Its observers still need exactly one terminal cancellation result.
+    if (!m_hasRun.load()) Q_EMIT transcodeFinished(false, true, QString(), QString());
 }
 
 void TranscodeTask::start(const ObjectId &owner, const QString &suffix, const QString &preParams, const QString &params, TranscodeSeek::TranscodeInfo info,
@@ -52,15 +66,32 @@ void TranscodeTask::start(const ObjectId &owner, const QString &suffix, const QS
     }
 }
 
+bool TranscodeTask::requestStop()
+{
+    if (m_isCanceled.testAndSetAcquire(0, 1)) {
+        Q_EMIT jobCanceled();
+        return true;
+    }
+    return false;
+}
+
 void TranscodeTask::run()
 {
+    m_hasRun.store(true);
     AbstractTaskDone whenFinished(m_owner.itemId, this);
+    bool succeeded = false;
+    QString output;
+    QString terminalError = i18n("Native transcoding did not create a valid output.");
+    const auto notifyCompletion = qScopeGuard([this, &succeeded, &output, &terminalError] {
+        Q_EMIT transcodeFinished(succeeded, bool(m_isCanceled) && !succeeded, output, m_isCanceled && !succeeded ? QString() : terminalError);
+    });
     if (m_isCanceled || pCore->taskManager.isBlocked()) {
         return;
     }
     QMutexLocker lock(&m_runMutex);
     m_progress = 0;
     m_running = true;
+    Q_EMIT transcodeProgress(0);
     auto binClip = pCore->projectItemModel()->getClipByBinID(QString::number(m_owner.itemId));
     QTemporaryFile src;
     if (m_transcodeInfo.type == ClipType::Text || m_transcodeInfo.type == ClipType::Timeline) {
@@ -111,6 +142,42 @@ void TranscodeTask::run()
         path = fileName + num + m_suffix + transcoderExt;
     }
     QString destUrl = dir.absoluteFilePath(path.section(QLatin1Char('.'), 0, -2));
+    std::unique_ptr<QTemporaryDir> staging;
+    QString requestedOutput;
+    if (!m_requestedOutputPath.isEmpty()) {
+        const QFileInfo requested(m_requestedOutputPath);
+        const QString parent = requested.absoluteDir().canonicalPath();
+        const QString leaf = requested.fileName();
+        if (!QDir::isAbsolutePath(m_requestedOutputPath) || parent.isEmpty() || requested.exists() || requested.isSymLink() || leaf.isEmpty() ||
+            leaf.contains(QLatin1Char(':')) || leaf.contains(QChar::Null) || leaf.endsWith(QLatin1Char('.')) || leaf.endsWith(QLatin1Char(' ')) ||
+            !QFileInfo(parent).isWritable() || requested.suffix().compare(transcoderExt.mid(1), Qt::CaseInsensitive) != 0) {
+            terminalError = i18n("Use a new local output file matching the transcoding profile.");
+            return;
+        }
+        requestedOutput = QDir(parent).absoluteFilePath(leaf);
+        staging = std::make_unique<QTemporaryDir>(QDir(parent).filePath(QStringLiteral(".kdenlive-transcode-XXXXXX")));
+        if (!staging->isValid()) {
+            terminalError = i18n("Cannot create a private transcoding staging folder.");
+            return;
+        }
+        destUrl = staging->filePath(QStringLiteral("result"));
+    }
+    auto awaitProcess = [this]() {
+        if (m_requestedOutputPath.isEmpty()) {
+            m_jobProcess->waitForFinished(-1);
+        } else {
+            // Cancellation is polled on the QProcess-owning worker thread.
+            while (m_jobProcess->state() != QProcess::NotRunning && !m_jobProcess->waitForFinished(100)) {
+                if (m_isCanceled) {
+                    m_jobProcess->kill();
+                    m_jobProcess->waitForFinished(3000);
+                    break;
+                }
+            }
+        }
+        processLogInfo();
+        return m_jobProcess->exitStatus() == QProcess::NormalExit && m_jobProcess->exitCode() == 0 && !m_isCanceled;
+    };
 
     bool result;
     if (m_transcodeInfo.type == ClipType::Playlist || m_transcodeInfo.type == ClipType::SlideShow || m_transcodeInfo.type == ClipType::Text ||
@@ -165,13 +232,13 @@ void TranscodeTask::run()
         mltParameters.prepend(QStringLiteral("-protocol_whitelist"));
         m_jobProcess = new QProcess();
         // m_jobProcess->setProcessChannelMode(QProcess::MergedChannels);
-        QObject::connect(this, &TranscodeTask::jobCanceled, m_jobProcess, &QProcess::kill, Qt::DirectConnection);
-        QObject::connect(m_jobProcess, &QProcess::readyReadStandardError, this, &TranscodeTask::processLogInfo);
+        if (m_requestedOutputPath.isEmpty()) QObject::connect(this, &TranscodeTask::jobCanceled, m_jobProcess, &QProcess::kill, Qt::DirectConnection);
+        QObject::connect(m_jobProcess, &QProcess::readyReadStandardError, this, &TranscodeTask::processLogInfo, Qt::DirectConnection);
         m_jobProcess->start(KdenliveSettings::meltpath(), mltParameters);
         AbstractTask::setPreferredPriority(m_jobProcess->processId());
-        m_jobProcess->waitForFinished(-1);
-        result = m_jobProcess->exitStatus() == QProcess::NormalExit;
-        m_jobProcess->deleteLater();
+        result = awaitProcess();
+        delete m_jobProcess;
+        m_jobProcess = nullptr;
     } else {
         m_isFfmpegJob = true;
         QStringList parameters;
@@ -189,7 +256,7 @@ void TranscodeTask::run()
         }
         parameters << QStringLiteral("-y");
         if (m_inPoint > -1) {
-            parameters << QStringLiteral("-ss") << QString::number(GenTime(m_inPoint, pCore->getCurrentFps()).seconds());
+            parameters << QStringLiteral("-ss") << QString::number(GenTime(m_inPoint, m_projectFps).seconds());
         }
         parameters << QStringLiteral("-stats");
         if (!m_transcodePreParams.isEmpty()) {
@@ -197,7 +264,8 @@ void TranscodeTask::run()
         }
         parameters << QStringLiteral("-i") << m_transcodeInfo.url;
         if (m_outPoint > -1) {
-            parameters << QStringLiteral("-to") << QString::number(GenTime(m_outPoint - m_inPoint, pCore->getCurrentFps()).seconds());
+            parameters << QStringLiteral("-to")
+                       << QString::number(GenTime(m_outPoint - m_inPoint + (m_requestedOutputPath.isEmpty() ? 0 : 1), m_projectFps).seconds());
         }
         // Only output error data
         parameters << QStringLiteral("-v") << QStringLiteral("error");
@@ -223,18 +291,46 @@ void TranscodeTask::run()
         }
         qDebug() << "/// FULL TRANSCODE PARAMS:\n" << parameters << "\n------";
         m_jobProcess = new QProcess();
-        QObject::connect(this, &TranscodeTask::jobCanceled, m_jobProcess, &QProcess::kill, Qt::DirectConnection);
+        if (m_requestedOutputPath.isEmpty()) QObject::connect(this, &TranscodeTask::jobCanceled, m_jobProcess, &QProcess::kill, Qt::DirectConnection);
         QObject::connect(m_jobProcess, &QProcess::readyReadStandardError, this, &TranscodeTask::processLogInfo, Qt::DirectConnection);
         m_jobProcess->start(KdenliveSettings::ffmpegpath(), parameters, QIODevice::ReadOnly);
         AbstractTask::setPreferredPriority(m_jobProcess->processId());
-        m_jobProcess->waitForFinished(-1);
-        result = m_jobProcess->exitStatus() == QProcess::NormalExit;
-        m_jobProcess->deleteLater();
+        result = awaitProcess();
+        delete m_jobProcess;
+        m_jobProcess = nullptr;
     }
     destUrl.append(transcoderExt);
+    if (!m_requestedOutputPath.isEmpty() && result) {
+        if (m_isCanceled) return;
+        {
+            Mlt::Producer decoded(pCore->getProjectProfile(), destUrl.toUtf8().constData());
+            if (!decoded.is_valid() || decoded.get_length() <= 0 || QFileInfo(destUrl).size() <= 0) {
+                terminalError = i18n("Native transcoding output could not be decoded.");
+                return;
+            }
+        } // Release the decoder's file handle before publishing on Windows.
+        // QFile::rename never replaces an existing destination. Publication and
+        // cleanup therefore cannot delete a file created by another application.
+        if (m_isCanceled) return;
+        if (!QFile::rename(destUrl, requestedOutput)) {
+            terminalError = i18n("Cannot publish transcoded output; the destination may already exist.");
+            return;
+        }
+        destUrl = requestedOutput;
+    }
+    if (result && QFileInfo(destUrl).isFile() && QFileInfo(destUrl).size() > 0) {
+        succeeded = true;
+        terminalError.clear();
+        output = destUrl;
+    } else if (!m_logDetails.isEmpty())
+        terminalError = m_logDetails.right(8192);
+    if (!m_addToProject) {
+        m_progress = 100;
+        return;
+    }
     // remove temporary playlist if it exists
     m_progress = 100;
-    QMetaObject::invokeMethod(m_object, "updateJobProgress");
+    if (m_addToProject && m_object) QMetaObject::invokeMethod(m_object, "updateJobProgress");
     if (result) {
         if (QFileInfo(destUrl).size() == 0) {
             QFile::remove(destUrl);
@@ -283,8 +379,10 @@ void TranscodeTask::run()
 
 void TranscodeTask::processLogInfo()
 {
+    if (!m_jobProcess) return;
     const QString buffer = QString::fromUtf8(m_jobProcess->readAllStandardError());
     m_logDetails.append(buffer);
+    if (!m_requestedOutputPath.isEmpty() && m_logDetails.size() > 65536) m_logDetails = m_logDetails.right(65536);
     if (m_isFfmpegJob) {
         // Parse FFmpeg output
         if (m_jobDuration == 0) {
@@ -315,7 +413,8 @@ void TranscodeTask::processLogInfo()
             int val = 100 * progress / m_jobDuration;
             if (m_progress != val) {
                 m_progress = val;
-                QMetaObject::invokeMethod(m_object, "updateJobProgress");
+                Q_EMIT transcodeProgress(qBound(0, val, 100));
+                if (m_addToProject && m_object) QMetaObject::invokeMethod(m_object, "updateJobProgress");
             }
             // Q_EMIT jobProgress(int(100.0 * progress / m_jobDuration));
         }
@@ -325,7 +424,8 @@ void TranscodeTask::processLogInfo()
             int val = buffer.section(QStringLiteral("percentage:"), 1).simplified().section(QLatin1Char(' '), 0, 0).toInt();
             if (m_progress != val) {
                 m_progress = val;
-                QMetaObject::invokeMethod(m_object, "updateJobProgress");
+                Q_EMIT transcodeProgress(qBound(0, val, 100));
+                if (m_addToProject && m_object) QMetaObject::invokeMethod(m_object, "updateJobProgress");
             }
         }
     }

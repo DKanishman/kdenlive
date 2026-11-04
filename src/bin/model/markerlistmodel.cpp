@@ -20,6 +20,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QScopeGuard>
+#include <QSet>
 #include <utility>
 
 MarkerListModel::MarkerListModel(QString clipId, std::weak_ptr<DocUndoStack> undo_stack, QObject *parent)
@@ -49,37 +51,199 @@ void MarkerListModel::setup()
     connect(this, &MarkerListModel::dataChanged, this, &MarkerListModel::modelChanged);
 }
 
-void MarkerListModel::loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> remapCategories)
+namespace {
+bool categoryMetadataEqual(const QMap<int, Core::MarkerCategory> &left, const QMap<int, Core::MarkerCategory> &right)
 {
-    // Remove all markers of deleted category
-    Fun local_undo = []() { return true; };
-    Fun local_redo = []() { return true; };
-    QList<int> deletedCategories = loadCategories(categories);
-    while (!deletedCategories.isEmpty()) {
-        int ix = deletedCategories.takeFirst();
-        const QList<CommentedTime> toDelete = getAllMarkers(ix);
-        if (remapCategories.contains(ix)) {
-            int newType = remapCategories.value(ix);
-            for (const auto &c : toDelete) {
-                addMarker(c.time(), c.comment(), newType, local_undo, local_redo);
-            }
+    if (left.size() != right.size()) return false;
+    for (auto i = left.cbegin(); i != left.cend(); ++i) {
+        auto other = right.constFind(i.key());
+        if (other == right.cend() || i->color != other->color || i->displayName != other->displayName) return false;
+    }
+    return true;
+}
+
+bool parseCategoryMetadata(const QStringList &categories, QMap<int, Core::MarkerCategory> &result)
+{
+    if (categories.isEmpty()) return false;
+    for (const auto &category : categories) {
+        if (category.count(QLatin1Char(':')) < 2) return false;
+        bool ok = false;
+        const int id = category.section(QLatin1Char(':'), -2, -2).toInt(&ok);
+        const QString name = category.section(QLatin1Char(':'), 0, -3);
+        const QColor color(category.section(QLatin1Char(':'), -1).simplified());
+        if (!ok || id < 0 || result.contains(id) || name.isEmpty() || name.contains(QChar::Null) || !color.isValid()) return false;
+        result.insert(id, {color, name});
+    }
+    return true;
+}
+
+bool sameCategoryMarker(const CommentedTime &left, const CommentedTime &right)
+{
+    // CommentedTime::operator== compares only time.
+    return left.time() == right.time() && left.duration() == right.duration() && left.comment() == right.comment() && left.markerType() == right.markerType();
+}
+} // namespace
+
+bool MarkerListModel::categoryMarkersMatch(const CategoryMarkers &expected, const CategoryMarkers &replacement) const
+{
+    for (const auto &[id, marker] : expected) {
+        auto found = m_markerList.find(id);
+        if (found == m_markerList.end() || !sameCategoryMarker(found->second, marker) || getIdFromPos(marker.time()) != id) return false;
+    }
+    for (const auto &[id, marker] : replacement) {
+        if (expected.count(id) == 0 && (m_markerList.count(id) > 0 || hasMarker(marker.time()))) return false;
+    }
+    return true;
+}
+
+void MarkerListModel::replaceCategoryMarkers(const CategoryMarkers &expected, const CategoryMarkers &replacement)
+{
+    for (const auto &[id, marker] : expected) {
+        if (replacement.count(id) > 0) continue;
+        const int row = getRowfromId(id);
+        beginRemoveRows(QModelIndex(), row, row);
+        m_markerList.erase(id);
+        m_markerPositions.remove(marker.time().frames(pCore->getCurrentFps()));
+        endRemoveRows();
+        removeSnapPoint(marker.time());
+        if (marker.hasRange()) removeSnapPoint(marker.time() + marker.duration());
+    }
+    for (const auto &[id, marker] : replacement) {
+        if (expected.count(id) > 0) {
+            // A category reassignment changes no snap point, position, comment, duration, or ID.
+            m_markerList.at(id) = marker;
+            const int row = getRowfromId(id);
+            Q_EMIT dataChanged(index(row), index(row), {TypeRole, ColorRole});
         } else {
-            for (const auto &c : toDelete) {
-                removeMarker(c.time(), local_undo, local_redo);
-            }
+            const int row = static_cast<int>(std::distance(m_markerList.begin(), m_markerList.lower_bound(id)));
+            beginInsertRows(QModelIndex(), row, row);
+            m_markerList.emplace(id, marker);
+            m_markerPositions.insert(marker.time().frames(pCore->getCurrentFps()), id);
+            endInsertRows();
+            addSnapPoint(marker.time());
+            if (marker.hasRange()) addSnapPoint(marker.time() + marker.duration());
         }
     }
-    Fun undo = [this, currentCategories]() {
-        loadCategories(currentCategories);
+}
+
+bool MarkerListModel::categoryTransaction(const QList<std::shared_ptr<MarkerListModel>> &inputModels, const QList<int> &toRemove,
+                                          const QMap<int, int> &remapCategories, const QStringList &categories, bool updateMetadata, Fun &undo, Fun &redo)
+{
+    const auto oldCategories = pCore->markerTypes;
+    auto newCategories = oldCategories;
+    if (updateMetadata) {
+        newCategories.clear();
+        if (!parseCategoryMetadata(categories, newCategories)) return false;
+    }
+    QSet<int> removed(toRemove.cbegin(), toRemove.cend());
+    if (updateMetadata) {
+        for (auto i = oldCategories.cbegin(); i != oldCategories.cend(); ++i) {
+            if (!newCategories.contains(i.key())) removed.insert(i.key());
+        }
+    }
+    for (auto i = remapCategories.cbegin(); i != remapCategories.cend(); ++i) {
+        if (!removed.contains(i.key()) || !newCategories.contains(i.value()) || removed.contains(i.value())) return false;
+    }
+    struct Changes
+    {
+        std::shared_ptr<MarkerListModel> model;
+        CategoryMarkers before;
+        CategoryMarkers after;
+    };
+    QList<Changes> changes;
+    QSet<MarkerListModel *> seen;
+    std::vector<QReadWriteLock *> locks;
+    const auto unlock = qScopeGuard([&locks] {
+        for (auto *lock : locks)
+            lock->unlock();
+    });
+    for (const auto &model : inputModels) {
+        if (!model) return false;
+        if (seen.contains(model.get())) continue;
+        seen.insert(model.get());
+        if (!model->m_lock.tryLockForWrite()) return false;
+        locks.push_back(&model->m_lock);
+        if (model->m_pendingImports > 0) return false;
+        Changes change{model, {}, {}};
+        for (const auto &[id, marker] : model->m_markerList) {
+            if (!removed.contains(marker.markerType())) continue;
+            change.before.emplace(id, marker);
+            if (remapCategories.contains(marker.markerType())) {
+                auto replacement = marker;
+                replacement.setMarkerType(remapCategories.value(marker.markerType()));
+                change.after.emplace(id, replacement);
+            }
+        }
+        changes.push_back(std::move(change));
+    }
+    if (changes.isEmpty()) return false;
+    const bool metadataChanged = !categoryMetadataEqual(oldCategories, newCategories);
+    bool markersChanged = false;
+    for (const auto &change : changes)
+        markersChanged |= !change.before.empty();
+    if (!metadataChanged && !markersChanged) return true;
+    const auto apply = [changes, oldCategories, newCategories, updateMetadata](bool forward) {
+        std::vector<QReadWriteLock *> transactionLocks;
+        const auto release = qScopeGuard([&transactionLocks] {
+            for (auto *lock : transactionLocks)
+                lock->unlock();
+        });
+        for (const auto &change : changes) {
+            if (!change.model->m_lock.tryLockForWrite()) return false;
+            transactionLocks.push_back(&change.model->m_lock);
+            if (change.model->m_pendingImports > 0) return false;
+        }
+        if (!categoryMetadataEqual(pCore->markerTypes, forward ? oldCategories : newCategories)) return false;
+        // Validate every model before the first change, including restore-position collisions.
+        for (const auto &change : changes) {
+            if (!change.model->categoryMarkersMatch(forward ? change.before : change.after, forward ? change.after : change.before)) return false;
+        }
+        if (updateMetadata) pCore->markerTypes = forward ? newCategories : oldCategories;
+        for (const auto &change : changes) {
+            change.model->replaceCategoryMarkers(forward ? change.before : change.after, forward ? change.after : change.before);
+        }
+        if (updateMetadata) {
+            for (const auto &change : changes) {
+                Q_EMIT change.model->categoriesChanged();
+                if (change.model->rowCount() > 0)
+                    Q_EMIT change.model->dataChanged(change.model->index(0), change.model->index(change.model->rowCount() - 1), {ColorRole});
+            }
+            Q_EMIT pCore->saveGuideCategories();
+        }
         return true;
     };
-    Fun redo = [this, categories]() {
-        loadCategories(categories);
-        return true;
-    };
-    PUSH_FRONT_LAMBDA(local_redo, redo);
-    PUSH_LAMBDA(local_undo, undo);
-    pCore->pushUndo(undo, redo, i18n("Update timeline markers categories"));
+    Fun localRedo = [apply] { return apply(true); };
+    Fun localUndo = [apply] { return apply(false); };
+    if (!localRedo()) return false;
+    UPDATE_UNDO_REDO_NOLOCK(localRedo, localUndo, undo, redo);
+    return true;
+}
+
+bool MarkerListModel::removeCategories(const QList<std::shared_ptr<MarkerListModel>> &models, const QList<int> &toRemove, const QMap<int, int> &remapCategories,
+                                       Fun &undo, Fun &redo)
+{
+    return categoryTransaction(models, toRemove, remapCategories, {}, false, undo, redo);
+}
+
+bool MarkerListModel::loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> &remapCategories,
+                                             Fun &undo, Fun &redo, const QList<std::shared_ptr<MarkerListModel>> &models)
+{
+    QMap<int, Core::MarkerCategory> expected;
+    if (!parseCategoryMetadata(currentCategories, expected) || !categoryMetadataEqual(expected, pCore->markerTypes)) return false;
+    auto affectedModels = models;
+    affectedModels.prepend(shared_from_this());
+    return categoryTransaction(affectedModels, {}, remapCategories, categories, true, undo, redo);
+}
+
+bool MarkerListModel::loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> remapCategories)
+{
+    auto stack = m_undoStack.lock();
+    if (!stack) return false;
+    const QStringList before = categoriesToStringList();
+    Fun undo = [] { return true; }, redo = [] { return true; };
+    if (!loadCategoriesWithUndo(categories, currentCategories, remapCategories, undo, redo)) return false;
+    if (before != categoriesToStringList()) stack->push(new FunctionalUndoCommand(undo, redo, i18n("Update timeline markers categories")));
+    return true;
 }
 
 QList<int> MarkerListModel::loadCategories(const QStringList &categories, bool notify)
@@ -856,6 +1020,30 @@ void MarkerListModel::registerSnapModel(const std::weak_ptr<SnapInterface> &snap
         qDebug() << "Error: added snapmodel is null";
         Q_ASSERT(false);
     }
+}
+
+void MarkerListModel::scheduleImportFromJson(const QString &data)
+{
+    QWriteLocker locker(&m_lock);
+    ++m_pendingImports;
+    // The QObject context cancels queued work if the model is destroyed, matching
+    // the former queued meta-method invocation's lifetime and timing.
+    if (!QMetaObject::invokeMethod(
+            this,
+            [this, data] {
+                QWriteLocker importLocker(&m_lock);
+                const auto finished = qScopeGuard([this] { --m_pendingImports; });
+                importFromJson(data, true, false);
+            },
+            Qt::QueuedConnection)) {
+        --m_pendingImports;
+    }
+}
+
+bool MarkerListModel::hasPendingImport() const
+{
+    READ_LOCK();
+    return m_pendingImports > 0;
 }
 
 bool MarkerListModel::importFromFile(const QString &fileData, bool ignoreConflicts)

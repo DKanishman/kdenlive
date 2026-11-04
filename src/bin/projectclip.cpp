@@ -117,7 +117,7 @@ ProjectClip::ProjectClip(const QString &id, const QIcon &thumb, const std::share
             [&]() { setProducerProperty(QStringLiteral("kdenlive:markers"), m_markerModel->toJson()); });
     const QString markers = getProducerProperty(QStringLiteral("kdenlive:markers"));
     if (!markers.isEmpty()) {
-        QMetaObject::invokeMethod(m_markerModel.get(), "importFromJson", Qt::QueuedConnection, Q_ARG(QString, markers), Q_ARG(bool, true), Q_ARG(bool, false));
+        m_markerModel->scheduleImportFromJson(markers);
     }
     setTags(getProducerProperty(QStringLiteral("kdenlive:tags")));
     loadMasks(getProducerProperty(QStringLiteral("kdenlive:masks")));
@@ -1023,10 +1023,22 @@ std::shared_ptr<Mlt::Producer> ProjectClip::getTimelineProducer(int trackId, int
                 if (m_streamEffects.contains(audioStream)) {
                     QStringList effects = m_streamEffects.value(audioStream);
                     for (const QString &effect : std::as_const(effects)) {
-                        Mlt::Filter filt(finalProducer->get_profile(), effect.toUtf8().constData());
+                        // Source stream effects use the same service/parameter format
+                        // as addAudioStreamEffect, including gain and channel routing.
+                        QStringList parameters = effect.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+                        if (parameters.isEmpty()) {
+                            continue;
+                        }
+                        const QString service = parameters.takeFirst();
+                        Mlt::Filter filt(finalProducer->get_profile(), service.toUtf8().constData());
                         if (filt.is_valid()) {
-                            // Add stream effect markup
                             filt.set("kdenlive:stream", 1);
+                            for (const QString &parameter : std::as_const(parameters)) {
+                                const int separator = parameter.indexOf(QLatin1Char('='));
+                                if (separator > 0) {
+                                    filt.set(parameter.left(separator).toUtf8().constData(), parameter.mid(separator + 1).toUtf8().constData());
+                                }
+                            }
                             finalProducer->attach(filt);
                         }
                     }
@@ -1940,17 +1952,21 @@ void ProjectClip::setProperties(const QMap<QString, QString> &properties, bool r
         if (properties.contains(QStringLiteral("kdenlive:active_streams")) && m_audioInfo) {
             // Clip is a multi audio stream and currently in clip monitor, update target tracks
             m_audioInfo->updateActiveStreams(properties.value(QStringLiteral("kdenlive:active_streams")));
-            pCore->bin()->updateTargets(clipId());
-            if (!audioStreamChanged) {
-                pCore->bin()->reloadMonitorStreamIfActive(clipId());
-                pCore->bin()->checkProjectAudioTracks(clipId(), m_audioInfo->activeStreams().count());
-                refreshPanel = true;
+            if (pCore->bin()) {
+                pCore->bin()->updateTargets(clipId());
+                if (!audioStreamChanged) {
+                    pCore->bin()->reloadMonitorStreamIfActive(clipId());
+                    pCore->bin()->checkProjectAudioTracks(clipId(), m_audioInfo->activeStreams().count());
+                    refreshPanel = true;
+                }
             }
         }
         if (audioStreamChanged) {
             refreshAudioInfo();
             Q_EMIT audioThumbReady();
-            pCore->bin()->reloadMonitorStreamIfActive(clipId());
+            if (pCore->bin()) {
+                pCore->bin()->reloadMonitorStreamIfActive(clipId());
+            }
             refreshPanel = true;
         }
     }
@@ -2881,10 +2897,12 @@ void ProjectClip::renameAudioStream(int id, const QString &name)
         m_audioInfo->renameStream(id, name);
         QString prop = QStringLiteral("kdenlive:streamname.%1").arg(id);
         m_masterProducer->set(prop.toUtf8().constData(), name.toUtf8().constData());
-        if (m_audioInfo->activeStreams().keys().contains(id)) {
-            pCore->bin()->updateTargets(clipId());
+        if (pCore->bin()) {
+            if (m_audioInfo->activeStreams().keys().contains(id)) {
+                pCore->bin()->updateTargets(clipId());
+            }
+            pCore->bin()->reloadMonitorStreamIfActive(clipId());
         }
-        pCore->bin()->reloadMonitorStreamIfActive(clipId());
     }
 }
 

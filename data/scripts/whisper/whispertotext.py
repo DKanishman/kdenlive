@@ -7,6 +7,8 @@ import re
 import subprocess
 import sys
 import argparse
+import json
+import wave
 
 import torch
 import whisper
@@ -43,7 +45,8 @@ def extract_zone(source, outfile, in_point, out_point, ffmpeg_path):
                             stdout=subprocess.PIPE)
 
 
-def run_whisper(source, model, device="cpu", task="transcribe", extraparams=""):
+def run_whisper(source, model, device="cpu", task="transcribe", extraparams="",
+                model_root=None, pcm_source=False, language=None, ffmpeg_path=None):
 
     # whisper.load_model checks the model's SHA on each run, so directly load the model
     #model = whisper.load_model(model, device)
@@ -53,20 +56,37 @@ def run_whisper(source, model, device="cpu", task="transcribe", extraparams=""):
     url = whisper._MODELS[model]
     checkpoint_file = os.path.join(download_root, os.path.basename(url))
     alignment_heads = whisper._ALIGNMENT_HEADS[model]
-    with (
-        open(checkpoint_file, "rb")
-    ) as fp:
-        kwargs = {"weights_only": True} if torch.__version__ >= "1.13" else {}
-        checkpoint = torch.load(fp, map_location=device, **kwargs)
-    del checkpoint_file
-    dims = whisper.ModelDimensions(**checkpoint["dims"])
-    model = whisper.Whisper(dims)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    if model_root is not None:
+        # MCP supplies an existing local checkpoint; never pass a model alias to
+        # load_model, which may download or replace an invalid cached model.
+        checkpoint_file = os.path.join(os.path.abspath(model_root), os.path.basename(url))
+        if not os.path.isabs(model_root) or not os.path.isfile(checkpoint_file):
+            raise FileNotFoundError("The selected local Whisper checkpoint is unavailable")
+        loadedModel = whisper.load_model(checkpoint_file, device=device)
+        if alignment_heads is not None:
+            loadedModel.set_alignment_heads(alignment_heads)
+    else:
+        # Preserve the existing GUI loader and its default cache location.
+        with open(checkpoint_file, "rb") as fp:
+            kwargs = {"weights_only": True} if torch.__version__ >= "1.13" else {}
+            checkpoint = torch.load(fp, map_location=device, **kwargs)
+        dims = whisper.ModelDimensions(**checkpoint["dims"])
+        loadedModel = whisper.Whisper(dims)
+        loadedModel.load_state_dict(checkpoint["model_state_dict"])
+        if alignment_heads is not None:
+            loadedModel.set_alignment_heads(alignment_heads)
+        loadedModel = loadedModel.to(device)
 
-    if alignment_heads is not None:
-        model.set_alignment_heads(alignment_heads)
-
-    loadedModel = model.to(device)
+    if pcm_source:
+        # Pre-extracted PCM avoids Whisper's ffmpeg subprocess, so cancellation
+        # owns exactly one process. Validate before allocating the sample array.
+        import numpy as np
+        with wave.open(source, "rb") as pcm:
+            if (pcm.getnchannels(), pcm.getsampwidth(), pcm.getframerate(), pcm.getcomptype()) != (1, 2, 16000, "NONE"):
+                raise ValueError("PCM input must be uncompressed mono 16-bit 16000 Hz WAV")
+            if pcm.getnframes() > 16000 * 1800:
+                raise ValueError("PCM input exceeds the 30-minute job limit")
+            source = np.frombuffer(pcm.readframes(pcm.getnframes()), dtype="<i2").astype(np.float32) / 32768.0
 
     transcribe_kwargs = {
         "task": task,
@@ -98,6 +118,12 @@ def run_whisper(source, model, device="cpu", task="transcribe", extraparams=""):
                     print(f"UPDATED FFMPEG PATH: {np}", file=sys.stdout, flush=True)
                 else:
                     transcribe_kwargs[param[0]] = param[1]
+
+    # Typed CLI values must retain spaces and '=' characters in paths/names.
+    if language:
+        transcribe_kwargs["language"] = language
+    if ffmpeg_path:
+        os.environ["PATH"] += os.pathsep + os.path.dirname(os.path.abspath(ffmpeg_path))
 
     if 'fp16' in transcribe_kwargs and transcribe_kwargs['fp16'] == 'False':
         transcribe_kwargs["fp16"] = False
@@ -142,6 +168,9 @@ def main():
     parser.add_argument("--temporary_file", help="temporary transcoding output file")
     parser.add_argument("-F", "--ffmpeg_path", help="path for ffmpeg")
     parser.add_argument("-L", "--language", help="transcription language")
+    parser.add_argument("--model_root", help="existing local model directory; no downloads")
+    parser.add_argument("--pcm_source", action="store_true", help="read pre-extracted mono 16k PCM WAV without ffmpeg")
+    parser.add_argument("--result_file", help="write exact native segment/word timestamps as UTF-8 JSON")
     args = parser.parse_args()
 
     src = args.src
@@ -154,7 +183,10 @@ def main():
     print(f"ANALYSING SOURCE FILE: {source}.")
     if not os.path.exists(source):
         print(f"Source file does not exist: {source}.")
-        sys.exit()
+        return 1
+
+    if args.pcm_source and (float(args.in_point) != 0 or float(args.out_point) != 0):
+        raise ValueError("PCM source ranges must be extracted before recognition")
 
     if float(args.in_point) > 0 or float(args.out_point) > 0:
         tmp_file = args.temporary_file
@@ -166,13 +198,18 @@ def main():
     task = args.task
     language = args.language
     ffmpeg_path = args.ffmpeg_path
-    jobArgs = ''
-    if ffmpeg_path:
-        jobArgs = f"ffmpeg_path={ffmpeg_path} "
-    if language:
-        jobArgs += f"language={language} "
-
-    result = run_whisper(source, model, device, task, jobArgs)
+    result = run_whisper(source, model, device, task, model_root=args.model_root,
+                         pcm_source=args.pcm_source, language=language, ffmpeg_path=ffmpeg_path)
+    if args.result_file:
+        with open(args.result_file, "w", encoding="utf-8") as output:
+            # Export only the native time/text contract, avoiding unrelated
+            # decoder arrays/tensors that are not JSON serializable.
+            segments = [{"start": float(segment["start"]), "end": float(segment["end"]),
+                         "words": [{"start": float(word["start"]), "end": float(word["end"]), "word": word["word"]}
+                                   for word in segment["words"]]} for segment in result["segments"]]
+            json.dump({"language": result.get("language", ""), "segments": segments},
+                      output, ensure_ascii=False, allow_nan=False)
+        return 0
 
     for i in result["segments"]:
         start_time = i["start"]

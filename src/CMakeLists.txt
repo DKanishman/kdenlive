@@ -71,6 +71,33 @@ add_subdirectory(layouts)
 ## toplevel source code files
 list(APPEND kdenlive_SRCS
     core.cpp
+    mcp/mcpserver.cpp
+    mcp/mcpserver.h
+    mcp/mcphelpers.h
+    mcp/mcpwire.cpp
+    mcp/mcpwire.h
+    mcp/mcptimeline.cpp
+    mcp/mcpeffects.cpp
+    mcp/mcprotospline.h
+    mcp/mcplifecycle.cpp
+    mcp/mcpui.cpp
+    mcp/mcpquick.cpp
+    mcp/mcpquick.h
+    mcp/mcpmedia.cpp
+    mcp/mcpmedia.h
+    mcp/mcpmonitor.cpp
+    mcp/mcpmonitor.h
+    mcp/mcpprofiles.cpp
+    mcp/mcpprofiles.h
+    mcp/mcpspeech.cpp
+    mcp/mcpspeech.h
+    mcp/mcpmarkers.cpp
+    mcp/mcpmarkers.h
+    mcp/mcptitles.cpp
+    mcp/mcptitles.h
+    mcp/mcpsequence.h
+    mcp/mcpstate.cpp
+    mcp/mcpstate.h
     definitions.cpp
     mainwindow.cpp
     mainwindow_actions.cpp
@@ -243,6 +270,7 @@ endif()
 
 target_link_libraries(kdenlive PUBLIC kdenliveLib kdenliveLibplugin)
 install(TARGETS kdenlive DESTINATION ${KDE_INSTALL_BINDIR})
+install(PROGRAMS mcp/kdenlive-mcp.py DESTINATION ${KDE_INSTALL_BINDIR})
 
 ## Kdenlive Lib
 target_include_directories(kdenliveLib PRIVATE
@@ -298,6 +326,7 @@ endif()
 
 target_link_libraries(kdenliveLib PUBLIC
     Qt${QT_MAJOR_VERSION}::Core
+    Qt${QT_MAJOR_VERSION}::Network
     Qt${QT_MAJOR_VERSION}::Svg
     Qt${QT_MAJOR_VERSION}::Quick
     Qt${QT_MAJOR_VERSION}::QuickControls2

@@ -152,6 +152,11 @@ bool TreeItem::changeParent(std::shared_ptr<TreeItem> newParent)
     return res;
 }
 
+std::vector<std::shared_ptr<TreeItem>> TreeItem::directChildren() const
+{
+    return {m_childItems.cbegin(), m_childItems.cend()};
+}
+
 std::shared_ptr<TreeItem> TreeItem::child(int row) const
 {
     Q_ASSERT(row >= 0 && row < int(m_childItems.size()));

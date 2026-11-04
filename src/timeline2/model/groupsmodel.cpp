@@ -776,8 +776,9 @@ QJsonObject GroupsModel::toJson(int gid) const
         // in that case we have a clip or composition
         if (auto ptr = m_parent.lock()) {
             Q_ASSERT(ptr->isClip(gid) || ptr->isComposition(gid) || ptr->isSubTitle(gid));
-            currentGroup.insert(QLatin1String("leaf"),
-                                QJsonValue(QLatin1String(ptr->isClip(gid) ? "clip" : ptr->isComposition(gid) ? "composition" : "subtitle")));
+            currentGroup.insert(QLatin1String("leaf"), QJsonValue(QLatin1String(ptr->isClip(gid)          ? "clip"
+                                                                                : ptr->isComposition(gid) ? "composition"
+                                                                                                          : "subtitle")));
             int track = ptr->isSubTitle(gid) ? -2 : ptr->getTrackPosition(ptr->getItemTrackId(gid));
             int pos = ptr->getItemPosition(gid);
             int subLayer = ptr->isSubTitle(gid) ? ptr->getSubtitleLayer(gid) : -1;
@@ -1093,7 +1094,7 @@ bool GroupsModel::checkConsistency(bool failOnSingleGroups, bool checkTimelineCo
 
     if (checkTimelineConsistency) {
         if (auto ptr = m_parent.lock()) {
-            auto isTimelineObject = [&](int cid) { return ptr->isClip(cid) || ptr->isComposition(cid); };
+            auto isTimelineObject = [&](int cid) { return ptr->isClip(cid) || ptr->isComposition(cid) || ptr->isSubTitle(cid); };
             for (int g : ptr->m_allGroups) {
                 if (m_upLink.count(g) == 0 || getType(g) == GroupType::Leaf) {
                     qDebug() << "ERROR: Timeline contains inconsistent group data";
@@ -1103,7 +1104,7 @@ bool GroupsModel::checkConsistency(bool failOnSingleGroups, bool checkTimelineCo
             for (const auto &elem : m_upLink) {
                 if (getType(elem.first) == GroupType::Leaf) {
                     if (!isTimelineObject(elem.first)) {
-                        qDebug() << "ERROR: Group model contains leaf element that is not a clip nor a composition";
+                        qDebug() << "ERROR: Group model contains leaf element that is not a live clip, composition or subtitle";
                         return false;
                     }
                 } else {
@@ -1121,7 +1122,9 @@ bool GroupsModel::checkConsistency(bool failOnSingleGroups, bool checkTimelineCo
                         int cid1 = (*it);
                         ++it;
                         int cid2 = (*it);
-                        if (!isTimelineObject(cid1) || !isTimelineObject(cid2)) {
+                        // AVSplit has a stricter contract than a normal group:
+                        // its two leaves must be audio/video timeline clips.
+                        if (!ptr->isClip(cid1) || !ptr->isClip(cid2)) {
                             qDebug() << "ERROR: Group model contains an AVSplit group with invalid members";
                             return false;
                         }

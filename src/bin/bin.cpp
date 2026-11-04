@@ -61,6 +61,9 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "undohelper.hpp"
 #include "utils/thumbnailcache.hpp"
 #include "xml/xml.hpp"
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QSet>
 
 #include <KActionMenu>
 #include <KColorScheme>
@@ -3859,6 +3862,9 @@ void Bin::reloadClip(const QString &id)
 void Bin::reloadMonitorIfActive(const QString &id)
 {
     Monitor *monitor = pCore->getMonitor(Kdenlive::ClipMonitor);
+    if (!monitor) {
+        return;
+    }
     if (monitor->activeClipId() == id || monitor->activeClipId().isEmpty()) {
         slotOpenCurrent();
         if (monitor->activeClipId() == id) {
@@ -3884,16 +3890,21 @@ void Bin::reloadMonitorIfActive(const QString &id)
 
 void Bin::reloadMonitorStreamIfActive(const QString &id)
 {
-    if (pCore->getMonitor(Kdenlive::ClipMonitor)->activeClipId() == id) {
-        pCore->getMonitor(Kdenlive::ClipMonitor)->reloadActiveStream();
+    Monitor *monitor = pCore->getMonitor(Kdenlive::ClipMonitor);
+    if (monitor && monitor->activeClipId() == id) {
+        monitor->reloadActiveStream();
     }
 }
 
 void Bin::updateTargets(QString id)
 {
+    Monitor *monitor = pCore->getMonitor(Kdenlive::ClipMonitor);
+    if (!monitor) {
+        return;
+    }
     if (id == QLatin1String("-1")) {
-        id = pCore->getMonitor(Kdenlive::ClipMonitor)->activeClipId();
-    } else if (pCore->getMonitor(Kdenlive::ClipMonitor)->activeClipId() != id) {
+        id = monitor->activeClipId();
+    } else if (monitor->activeClipId() != id) {
         qDebug() << "ABOIRT A";
         return;
     }
@@ -6597,21 +6608,50 @@ int Bin::getAllClipMarkers(int category) const
     return markersCount;
 }
 
-void Bin::removeMarkerCategories(QList<int> toRemove, const QMap<int, int> remapCategories)
+bool Bin::markerModelsForCategoryChange(const std::shared_ptr<ProjectItemModel> &itemModel, QList<std::shared_ptr<MarkerListModel>> &models)
 {
-    Fun undo = []() { return true; };
-    Fun redo = []() { return true; };
-    bool found = false;
-    QList<std::shared_ptr<ProjectClip>> clipList = m_itemModel->getRootFolder()->childClips();
-    for (const std::shared_ptr<ProjectClip> &clip : std::as_const(clipList)) {
-        bool res = clip->removeMarkerCategories(toRemove, remapCategories, undo, redo);
-        if (!found && res) {
-            found = true;
+    if (!itemModel || !itemModel->getRootFolder()) return false;
+    auto collected = models;
+    QSet<MarkerListModel *> seen;
+    for (const auto &model : std::as_const(collected)) {
+        if (!model) return false;
+        seen.insert(model.get());
+    }
+    const auto clips = itemModel->getRootFolder()->childClips();
+    for (const auto &clip : clips) {
+        if (!clip || !clip->statusReady()) return false;
+        const auto model = clip->getMarkerModel();
+        if (!model || model->hasPendingImport()) return false;
+        // ProjectClip queues its producer's marker import during construction. Do not
+        // discard markers that have not reached the live model yet, even if the producer is ready.
+        const QString stored = clip->getProducerProperty(QStringLiteral("kdenlive:markers"));
+        if (!stored.isEmpty()) {
+            const auto data = QJsonDocument::fromJson(stored.toUtf8());
+            if (!data.isArray() || (model->rowCount() == 0 && !data.array().isEmpty())) return false;
+        }
+        if (!seen.contains(model.get())) {
+            collected.append(model);
+            seen.insert(model.get());
         }
     }
-    if (found) {
-        pCore->pushUndo(undo, redo, i18n("Remove clip markers"));
+    models = std::move(collected);
+    return true;
+}
+
+bool Bin::removeMarkerCategories(QList<int> toRemove, const QMap<int, int> remapCategories)
+{
+    QList<std::shared_ptr<MarkerListModel>> models;
+    if (!markerModelsForCategoryChange(m_itemModel, models)) return false;
+    if (models.isEmpty()) return true;
+    bool changed = false;
+    for (const auto &model : std::as_const(models)) {
+        for (int category : std::as_const(toRemove))
+            changed |= !model->getAllMarkers(category).isEmpty();
     }
+    Fun undo = [] { return true; }, redo = [] { return true; };
+    if (!MarkerListModel::removeCategories(models, toRemove, remapCategories, undo, redo)) return false;
+    if (changed) pCore->pushUndo(undo, redo, i18n("Remove clip markers"));
+    return true;
 }
 
 QStringList Bin::sequenceReferencedClips(const QUuid &uuid) const

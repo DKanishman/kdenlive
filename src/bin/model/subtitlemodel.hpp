@@ -94,6 +94,8 @@ public:
         @param newSubtitleText is (new) subtitle text
     */
     bool editSubtitle(int id, const QString &newSubtitleText);
+    /** Atomically update an existing event without removing its native ID/group registration. */
+    bool updateSubtitleEvent(int id, std::pair<int, GenTime> start, const SubtitleEvent &event);
 
     /** @brief Remove subtitle at start position (pos) */
     bool removeSubtitle(int id, bool temporary = false, bool updateFilter = true);
@@ -116,10 +118,22 @@ public:
      * @param file The path to the text file
      * @return The name of the text encoding, as guessed by KEncodingProber, or
      * "" if an error occurred
-    */
+     */
     static QByteArray guessFileEncoding(const QString &file, bool *confidence);
     /** @brief Function that imports a subtitle file */
-    void importSubtitle(const QString &filePath, int offset = 0, bool externalImport = false, float startFramerate = 30.00, float targetFramerate = 30.00, const QByteArray &encoding = "UTF-8");
+    void importSubtitle(const QString &filePath, int offset = 0, bool externalImport = false, float startFramerate = 30.00, float targetFramerate = 30.00,
+                        const QByteArray &encoding = "UTF-8");
+    struct ImportResult
+    {
+        bool success{false};
+        int importedCount{0};
+        QString error;
+    };
+    /** Import with a checked result. ASS external imports validate the complete
+     * file before applying events and metadata in one undo command. An optional
+     * expected event count is checked before committing to document history. */
+    ImportResult importSubtitleWithUndo(const QString &filePath, int offset = 0, bool externalImport = false, float startFramerate = 30.00,
+                                        float targetFramerate = 30.00, const QByteArray &encoding = "UTF-8", int expectedCount = -1);
 
     /** @brief Exports the subtitle model to json */
     const QJsonArray toJson();
@@ -204,7 +218,8 @@ public:
     /** @brief Create a new subtitle track and return its subtitle index */
     int createNewSubtitle(const QString subtitleName = QString(), int id = -1);
     bool deleteSubtitle(int ix);
-    void activateSubtitle(int ix);
+    /** Activate a language as an undoable native state change, preserving event IDs on undo/redo. */
+    bool activateSubtitle(int ix, bool forceReload = false);
     /** @brief Get JSON data for all subtitles in this model */
     const QString subtitlesFilesToJson();
     /** @brief Get JSON data for all global styles in this model*/
@@ -293,6 +308,37 @@ public Q_SLOTS:
     bool setText(int id, const QString &text);
 
 private:
+    struct ImportMetadata
+    {
+        std::map<QString, SubtitleStyle> styles;
+        std::map<QString, QString> script;
+        QStringList defaultStyles;
+        QString fonts;
+        int maxLayer{0};
+        int activeLayer{0};
+    };
+    ImportMetadata captureImportMetadata() const;
+    void restoreImportMetadata(const ImportMetadata &metadata);
+    ImportResult importAssSubtitle(const QString &filePath, int offset, float startFramerate, float targetFramerate, const QByteArray &encoding,
+                                   int expectedCount);
+    struct LanguageState
+    {
+        std::map<std::pair<int, GenTime>, SubtitleEvent> events;
+        std::map<int, std::pair<int, GenTime>> ids;
+        std::map<QString, SubtitleStyle> styles;
+        std::map<QString, QString> script;
+        std::map<int, int> fakePositions;
+        QStringList defaultStyles;
+        QString fonts;
+        QString file;
+        int maxLayer{0};
+        int activeLayer{0};
+    };
+    /** Swap complete active state, preserving std::map node/iterator identity held by undo commands. */
+    bool swapLanguageState(LanguageState &state);
+    bool exchangeLanguageState(int id, const Fun &exchange);
+    void languageStateActivated(int id);
+    bool m_languageStateChanging{false};
     std::shared_ptr<TimelineItemModel> m_timeline;
     std::weak_ptr<DocUndoStack> m_undoStack;
     /** @brief A list of subtitles as: layer, start time, events */
@@ -328,6 +374,7 @@ Q_SIGNALS:
     void modelChanged();
     void updateSubtitleStyle(const QString);
     void activeSubLayerChanged();
+    void activeSubtitleChanged();
     void showSubtitleManager(int page);
 
 protected:

@@ -14,6 +14,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "bin/model/markersortmodel.h"
 #include "bin/model/subtitlemodel.hpp"
 #include "bin/projectclip.h"
+#include "bin/projectfolder.h"
 #include "bin/projectitemmodel.h"
 #include "core.h"
 #include "dialogs/profilesdialog.h"
@@ -54,6 +55,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QSaveFile>
 #include <QScopeGuard>
 #include <QStandardPaths>
+#include <QTemporaryFile>
 #include <QUndoGroup>
 #include <QUndoStack>
 #include <QtConcurrent/QtConcurrentRun>
@@ -411,27 +413,70 @@ const QStringList KdenliveDoc::guidesCategories()
     return categories;
 }
 
-void KdenliveDoc::updateGuideCategories(const QStringList &categories, const QMap<int, int> remapCategories)
+bool KdenliveDoc::updateGuideCategories(const QStringList &categories, const QMap<int, int> remapCategories)
 {
-    const QStringList currentCategories =
-        getGuideModel(activeUuid)->guideCategoriesToStringList(m_documentProperties.value(QStringLiteral("guidesCategories")));
-    // Check if a guide category was removed
-    QList<int> currentIndexes;
-    QList<int> updatedIndexes;
-    for (auto &cat : currentCategories) {
-        currentIndexes << cat.section(QLatin1Char(':'), -2, -2).toInt();
+    auto fail = [](const QString &message) {
+        pCore->displayMessage(message, ErrorMessage);
+        return false;
+    };
+    const auto active = m_timelines.value(activeUuid);
+    if (!active || !active->getGuideModel() || !m_commandStack) return fail(i18n("Cannot change marker categories: the active guide model is unavailable."));
+    const auto guideModel = active->getGuideModel();
+    const QStringList currentCategories = guideModel->categoriesToStringList();
+    if (categories == currentCategories && remapCategories.isEmpty()) return true;
+    QSet<int> updatedIndexes;
+    for (const auto &category : categories)
+        updatedIndexes.insert(category.section(QLatin1Char(':'), -2, -2).toInt());
+    if (pCore->markerTypes.contains(KdenliveSettings::default_marker_type()) && !updatedIndexes.contains(KdenliveSettings::default_marker_type()))
+        return fail(i18n("Keep the current default marker category. Choose another application default explicitly before deleting it."));
+    QList<std::shared_ptr<MarkerListModel>> models;
+    const auto itemModel = pCore->projectItemModel();
+    if (!Bin::markerModelsForCategoryChange(itemModel, models))
+        return fail(i18n("Cannot change marker categories while a source or sequence marker model is unavailable or still loading."));
+    // Use the live bin tree, not the cached sequence UUID map, which can contain
+    // deleted entries. Modern unopened sequences already own their marker model.
+    QSet<QUuid> sequences;
+    const auto clips = itemModel->getRootFolder()->childClips();
+    for (const auto &clip : clips) {
+        if (clip->clipType() == ClipType::Timeline) {
+            sequences.insert(clip->getSequenceUuid());
+            if (!clip->getProducerProperty(QStringLiteral("kdenlive:sequenceproperties.guides")).isEmpty())
+                return fail(i18n("Open the sequence containing pending legacy guides before changing marker categories."));
+        }
     }
-    for (auto &cat : categories) {
-        updatedIndexes << cat.section(QLatin1Char(':'), -2, -2).toInt();
+    for (auto i = m_timelines.cbegin(); i != m_timelines.cend(); ++i) {
+        if (!i.value() || !i.value()->getGuideModel()) return fail(i18n("Cannot change marker categories: a sequence guide model is unavailable."));
+        sequences.insert(i.key());
+        models.append(i.value()->getGuideModel());
     }
-    for (auto &i : updatedIndexes) {
-        currentIndexes.removeAll(i);
+    for (const auto &uuid : std::as_const(sequences)) {
+        if (!getSequenceProperty(uuid, QStringLiteral("guides")).isEmpty())
+            return fail(i18n("Open the sequence containing pending legacy guides before changing marker categories."));
     }
-    if (!currentIndexes.isEmpty()) {
-        // A marker category was removed, delete all Bin clip markers using it
-        pCore->bin()->removeMarkerCategories(currentIndexes, remapCategories);
-    }
-    getGuideModel(activeUuid)->loadCategoriesWithUndo(categories, currentCategories, remapCategories);
+    const QString property = QStringLiteral("guidesCategories");
+    const bool hadProperty = m_documentProperties.contains(property);
+    const QString oldProperty = m_documentProperties.value(property);
+    Fun markerUndo = [] { return true; }, markerRedo = [] { return true; };
+    if (!guideModel->loadCategoriesWithUndo(categories, currentCategories, remapCategories, markerUndo, markerRedo, models))
+        return fail(i18n("Cannot change marker categories: invalid categories, remapping, or a busy marker model. The project was unchanged."));
+    if (currentCategories == guideModel->categoriesToStringList()) return true;
+    const QString newProperty = guideModel->categoriesToJSon();
+    m_documentProperties.insert(property, newProperty);
+    Fun undo = [this, markerUndo, hadProperty, property, oldProperty] {
+        if (!markerUndo()) return false;
+        if (hadProperty)
+            m_documentProperties.insert(property, oldProperty);
+        else
+            m_documentProperties.remove(property);
+        return true;
+    };
+    Fun redo = [this, markerRedo, property, newProperty] {
+        if (!markerRedo()) return false;
+        m_documentProperties.insert(property, newProperty);
+        return true;
+    };
+    m_commandStack->push(new FunctionalUndoCommand(undo, redo, i18n("Update project marker categories")));
+    return true;
 }
 
 void KdenliveDoc::saveGuideCategories()
@@ -733,16 +778,46 @@ QDomDocument KdenliveDoc::xmlSceneList(const QString &scene)
     return sceneList;
 }
 
-bool KdenliveDoc::saveSceneList(const QString &path, const QString &scene, bool saveOverExistingFile)
+bool KdenliveDoc::saveSceneList(const QString &path, const QString &scene, bool saveOverExistingFile, QString *errorMessage, bool refuseOverwrite)
 {
+    if (errorMessage) errorMessage->clear();
+    const auto reportError = [errorMessage](const QString &message, const QString &detail = QString()) {
+        if (errorMessage) {
+            *errorMessage = detail.isEmpty() ? message : message + QStringLiteral(": ") + detail;
+        } else {
+            KMessageBox::error(QApplication::activeWindow(), message);
+        }
+        return false;
+    };
+    // Automated copies must not enter interactive backup/overwrite paths.
+    if (errorMessage && saveOverExistingFile) {
+        return reportError(i18n("Automated saving requires a new project file."));
+    }
     QDomDocument sceneList = xmlSceneList(scene);
     if (sceneList.isNull()) {
         // Make sure we don't save if scenelist is corrupted
-        KMessageBox::error(QApplication::activeWindow(), i18n("Cannot write to file %1, scene list is corrupted.", path));
-        return false;
+        return reportError(i18n("Cannot write to file %1, scene list is corrupted.", path));
     }
     const QByteArray sceneData = sceneList.toString().toUtf8();
     sceneList.clear();
+
+    if (errorMessage || refuseOverwrite) {
+        // Explicit new-file publication also supports native Save As bookkeeping in
+        // ProjectManager without replacing a target created during preparation.
+        QTemporaryFile file(QFileInfo(path).dir().absoluteFilePath(QStringLiteral(".kdenlive-new-XXXXXX")));
+        if (!file.open()) {
+            return reportError(i18n("Cannot write to file %1", path), file.errorString());
+        }
+        if (file.write(sceneData) != sceneData.size() || !file.flush()) {
+            return reportError(i18n("Cannot write to file %1", path), file.errorString());
+        }
+        file.close();
+        if (!file.rename(path)) {
+            return reportError(i18n("Cannot write to file %1", path), file.errorString());
+        }
+        file.setAutoRemove(false);
+        return true;
+    }
 
     // Backup current version
     backupLastSavedVersion(path);
@@ -779,14 +854,16 @@ bool KdenliveDoc::saveSceneList(const QString &path, const QString &scene, bool 
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qCWarning(KDENLIVE_LOG) << "//////  ERROR writing to file: " << path;
-        KMessageBox::error(QApplication::activeWindow(), i18n("Cannot write to file %1", path));
-        return false;
+        return reportError(i18n("Cannot write to file %1", path), file.errorString());
     }
 
-    file.write(sceneData);
+    if (file.write(sceneData) != sceneData.size()) {
+        const QString detail = file.errorString();
+        file.cancelWriting();
+        return reportError(i18n("Cannot write to file %1", path), detail);
+    }
     if (!file.commit()) {
-        KMessageBox::error(QApplication::activeWindow(), i18n("Cannot write to file %1", path));
-        return false;
+        return reportError(i18n("Cannot write to file %1", path), file.errorString());
     }
     (void)QtConcurrent::run(&KdenliveDoc::cleanupBackupFiles, this);
     QFileInfo info(path);

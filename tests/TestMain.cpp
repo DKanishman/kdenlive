@@ -8,6 +8,7 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QStandardPaths>
 #include <QString>
 #include <QtEnvironmentVariables>
 
@@ -48,6 +49,7 @@ QString getMltRepositoryPath()
 
 int main(int argc, char *argv[])
 {
+    QStandardPaths::setTestModeEnabled(true);
     QHashSeed::setDeterministicGlobalSeed();
     qputenv("MLT_REPOSITORY_DENY", "libmltqt:libmltglaxnimate");
     QApplication app(argc, argv);

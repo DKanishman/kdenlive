@@ -23,6 +23,32 @@
 // TODO:
 #include <QUndoGroup>
 
+namespace {
+// These labels become file-name suffixes, never paths or printf counters. Keep
+// the visible track/guide labels intact and sanitize only the exported leaf.
+QString safeRenderLabel(QString value)
+{
+    value.replace(QRegularExpression(QStringLiteral("[<>:\"/\\\\|?*%\\x00-\\x1f]")), QStringLiteral("_"));
+    value = value.left(120);
+    while (value.endsWith(QLatin1Char('.')) || value.endsWith(QLatin1Char(' ')))
+        value.chop(1);
+    if (value.isEmpty() || value == QLatin1String(".") || value == QLatin1String("..")) value = QStringLiteral("section");
+    static const QRegularExpression reserved(QStringLiteral("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\.|$)"), QRegularExpression::CaseInsensitiveOption);
+    if (reserved.match(value).hasMatch()) value.prepend(QLatin1Char('_'));
+    return value;
+}
+QString uniqueRenderLabel(const QString &label, QStringList &used)
+{
+    const QString base = safeRenderLabel(label);
+    QString candidate = base;
+    int suffix = 2;
+    while (used.contains(candidate, Qt::CaseInsensitive))
+        candidate = base + QStringLiteral("-%1").arg(suffix++);
+    used.append(candidate);
+    return candidate;
+}
+} // namespace
+
 QStringList RenderRequest::argsByJob(const RenderJob &job, bool addPid)
 {
     QStringList args = {QStringLiteral("delivery"), KdenliveSettings::meltpath(), job.playlistPath};
@@ -478,12 +504,7 @@ std::vector<RenderRequest::RenderSection> RenderRequest::getGuideSections()
                     section.name = markers.at(i).comment();
                     section.in = markers.at(i).time().frames(fps);
                 }
-                section.name.replace(QLatin1Char(':'), QLatin1Char('_'));
-                section.name.replace(QLatin1Char('?'), QLatin1Char('_'));
-                section.name.replace(QLatin1Char('/'), QLatin1Char('_'));
-                section.name.replace(QLatin1Char('\\'), QLatin1Char('_'));
-                section.name = QStringUtils::getUniqueName(names, section.name);
-                names << section.name;
+                section.name = uniqueRenderLabel(section.name, names);
 
                 // out point of section
                 section.out = m_boundingOut;
@@ -584,7 +605,7 @@ void RenderRequest::prepareMultiAudioFiles(std::vector<RenderJob> &jobs, const Q
         QString appendix = QStringLiteral("_A%1%2%3")
                                .arg(audioCount)
                                .arg(trackName.isEmpty() ? QString() : QStringLiteral("-"))
-                               .arg(trackName.replace(QStringLiteral(" "), QStringLiteral("_")));
+                               .arg(trackName.isEmpty() ? QString() : safeRenderLabel(trackName.replace(QStringLiteral(" "), QStringLiteral("_"))));
         RenderJob job;
         job.playlistPath = QStringUtils::appendToFilename(playlistFile, appendix);
         job.outputPath = QStringUtils::appendToFilename(targetFile, appendix);

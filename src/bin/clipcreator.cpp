@@ -328,7 +328,8 @@ QDomDocument ClipCreator::getXmlFromUrl(const QString &path, ClipType::ProducerT
 }
 
 QString ClipCreator::createClipFromFile(const QString &path, const QString &parentFolder, const std::shared_ptr<ProjectItemModel> &model, Fun &undo, Fun &redo,
-                                        const std::function<void(const QString &)> &readyCallBack, const bool &updateShouldCheckProfile)
+                                        const std::function<void(const QString &)> &readyCallBack, const bool &updateShouldCheckProfile,
+                                        bool suppressTranscodeDialog)
 {
     qDebug() << "/////////// createClipFromFile" << path << parentFolder;
     QDomDocument xml = getXmlFromUrl(path);
@@ -343,6 +344,11 @@ QString ClipCreator::createClipFromFile(const QString &path, const QString &pare
             (KdenliveSettings::default_profile().isEmpty() || KdenliveSettings::checkfirstprojectclip()) && !pCore->bin()->hasUserClip();
     }
 
+    // This import-only attribute is consumed by ClipLoadTask, not copied to
+    // producer properties or project files. Normal GUI imports retain dialogs.
+    if (suppressTranscodeDialog) {
+        xml.documentElement().setAttribute(QStringLiteral("noTranscodeDialog"), QStringLiteral("1"));
+    }
     bool res = model->requestAddBinClip(id, xml.documentElement(), parentFolder, undo, redo, readyCallBack);
     return res ? id : QStringLiteral("-1");
 }

@@ -1,0 +1,58 @@
+--- a/src/modules/xml/producer_xml.c
++++ b/src/modules/xml/producer_xml.c
+@@ -30,6 +30,8 @@
+ 
+ #ifndef _MSC_VER
+ #include <unistd.h>
++#else
++#include <direct.h>
+ #endif
+ 
+ #include <libxml/parser.h>
+--- a/src/tests/test_xml/test_xml.cpp
++++ b/src/tests/test_xml/test_xml.cpp
+@@ -16,6 +16,9 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <QDir>
++#include <QFile>
++#include <QTemporaryDir>
+ #include <QString>
+ #include <QtTest>
+ 
+@@ -36,6 +39,34 @@
+     TestXml() { Factory::init(); }
+ 
+ private Q_SLOTS:
++
++    void RelativeXmlPathUsesCurrentDirectory()
++    {
++        QTemporaryDir directory;
++        QVERIFY(directory.isValid());
++        QVERIFY(QDir(directory.path()).mkdir("relative"));
++        QFile file(directory.filePath("relative/project.mlt"));
++        QVERIFY(file.open(QIODevice::WriteOnly));
++        const QByteArray xml = R"(<mlt producer="main">
++  <producer id="color0" in="0" out="9">
++    <property name="mlt_service">color</property>
++    <property name="resource">red</property>
++  </producer>
++  <playlist id="main"><entry producer="color0" in="0" out="9"/></playlist>
++</mlt>)";
++        QCOMPARE(file.write(xml), qint64(xml.size()));
++        file.close();
++        struct RestoreDirectory {
++            QString path{QDir::currentPath()};
++            ~RestoreDirectory() { QDir::setCurrent(path); }
++        } restore;
++        QVERIFY(QDir::setCurrent(directory.path()));
++        Profile profile;
++        // The separator makes XML resolve its relative root using getcwd().
++        Producer producer(profile, "xml", "relative/project.mlt");
++        QVERIFY(producer.is_valid());
++        QCOMPARE(producer.get_length(), 10);
++    }
+ 
+     void NestedPropertiesRoundTrip()
+     {

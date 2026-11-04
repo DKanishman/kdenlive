@@ -6,6 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 
 #include "core.h"
+#include "mcp/mcpserver.h"
 #ifdef CRASH_AUTO_TEST
 #include "logger.hpp"
 #endif
@@ -13,7 +14,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "dialogs/wizard.h"
 #include "kdenlive_debug.h"
 #include "kdenlivesettings.h"
-// Required for MacOS definition of MLT_LC_NAME
+ // Required for MacOS definition of MLT_LC_NAME
 #include "lib/localeHandling.h"
 #include "render/renderrequest.h"
 #include <config-kdenlive.h>
@@ -344,6 +345,10 @@ int main(int argc, char *argv[])
     QCommandLineOption clipsOption(QStringLiteral("i"), i18n("Comma separated list of files to add as clips to the bin."), QStringLiteral("clips"));
     parser.addOption(clipsOption);
 
+    QCommandLineOption mcpSocketOption(QStringLiteral("mcp-socket"), i18n("Enable the experimental same-user MCP endpoint with an explicit socket name."),
+                                       QStringLiteral("name"));
+    parser.addOption(mcpSocketOption);
+
     // render options
     QCommandLineOption renderOption(QStringLiteral("render"), i18n("Directly render the project and exit."));
     parser.addOption(renderOption);
@@ -374,6 +379,12 @@ int main(int argc, char *argv[])
     // Parse command line
     parser.process(app);
     aboutData.processCommandLine(&parser);
+    if (parser.isSet(mcpSocketOption)) QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+
+    if (parser.isSet(mcpSocketOption) && (parser.isSet(renderOption) || parser.isSet(verifyOption) || parser.isSet(saveDebugOption))) {
+        qCritical() << "--mcp-socket requires the interactive editor.";
+        return EXIT_FAILURE;
+    }
 
     if (parser.isSet(saveDebugOption)) {
         const QString outputFilename = parser.value(saveDebugOption);
@@ -597,6 +608,17 @@ int main(int argc, char *argv[])
         result = EXIT_CLEAN_RESTART;
     } else {
         pCore->initGUI(parser.value(mltPathOption), app.url, clipsToLoad);
+        std::unique_ptr<KdenliveMcpServer> mcpServer;
+        if (parser.isSet(mcpSocketOption)) {
+            mcpServer = std::make_unique<KdenliveMcpServer>();
+            QString error;
+            if (!mcpServer->start(parser.value(mcpSocketOption), &error)) {
+                qCritical() << "Cannot start MCP endpoint:" << error;
+                mcpServer.reset();
+                Core::clean();
+                return EXIT_FAILURE;
+            }
+        }
         result = app.exec();
     }
     Core::clean();

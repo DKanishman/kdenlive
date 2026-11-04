@@ -1247,29 +1247,7 @@ bool ClipController::isFullRange() const
 
 bool ClipController::removeMarkerCategories(const QList<int> toRemove, const QMap<int, int> remapCategories, Fun &undo, Fun &redo)
 {
-    bool found = false;
-    if (m_markerModel->rowCount() == 0) {
-        return false;
-    }
-    for (int i : toRemove) {
-        const QList<CommentedTime> toDelete = m_markerModel->getAllMarkers(i);
-        if (!found && toDelete.count() > 0) {
-            found = true;
-        }
-        if (remapCategories.contains(i)) {
-            // Move markers to another category
-            int newType = remapCategories.value(i);
-            for (const CommentedTime &c : toDelete) {
-                m_markerModel->addMarker(c.time(), c.comment(), newType, undo, redo);
-            }
-        } else {
-            // Delete markers
-            for (const CommentedTime &c : toDelete) {
-                m_markerModel->removeMarker(c.time(), undo, redo);
-            }
-        }
-    }
-    return found;
+    return m_markerModel && MarkerListModel::removeCategories({m_markerModel}, toRemove, remapCategories, undo, redo);
 }
 
 std::shared_ptr<Mlt::Producer> ClipController::sequenceProducer(const QUuid &)

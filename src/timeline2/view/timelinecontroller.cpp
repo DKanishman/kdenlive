@@ -180,8 +180,9 @@ void TimelineController::loadSubtitleIndex()
         counter++;
     }
     Q_EMIT activeSubtitlePositionChanged();
-    connect(subtitleModel.get(), &SubtitleModel::activeSubLayerChanged, this, &TimelineController::activeSubLayerChanged);
-    connect(subtitleModel.get(), &SubtitleModel::showSubtitleManager, this, &TimelineController::showSubtitleManager);
+    connect(subtitleModel.get(), &SubtitleModel::activeSubtitleChanged, this, &TimelineController::loadSubtitleIndex, Qt::UniqueConnection);
+    connect(subtitleModel.get(), &SubtitleModel::activeSubLayerChanged, this, &TimelineController::activeSubLayerChanged, Qt::UniqueConnection);
+    connect(subtitleModel.get(), &SubtitleModel::showSubtitleManager, this, &TimelineController::showSubtitleManager, Qt::UniqueConnection);
 }
 
 void TimelineController::restoreTargetTracks()
@@ -3256,12 +3257,10 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
     std::unordered_set<int> sel = {};
     if (clipId == -1) {
         sel = m_model->getCurrentSelection();
-    }
-    else{
+    } else {
         if (m_model->isClip(clipId)) {
             sel = {clipId};
-        }
-        else {
+        } else {
             pCore->displayMessage(i18n("No item to edit"), ErrorMessage, 500);
             return;
         }
@@ -3269,8 +3268,7 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
     if (sel.empty()) {
         pCore->displayMessage(i18n("No item to edit"), ErrorMessage, 500);
         return;
-    }
-    else {
+    } else {
         for (int i : sel) {
             if (!m_model->isClip(i)) {
                 pCore->displayMessage(i18n("Cannot change speed of item(s)"), ErrorMessage, 500);
@@ -3284,17 +3282,15 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
     int duration = 0;
     if (sel.size() > 2) {
         speed = 100.;
-    }
-    else {
+    } else {
         int mainClipId = *sel.begin();
-        if(sel.size() == 2) {
+        if (sel.size() == 2) {
             mainClipId = getMainSelectedClip();
             int partnerId = m_model->m_groups->getSplitPartner(mainClipId);
             if (partnerId != -1 && sel.find(partnerId) != sel.end()) {
                 isSingleOrPartnerClip = true;
             }
-        }
-        else {
+        } else {
             isSingleOrPartnerClip = true;
         }
         if (isSingleOrPartnerClip) {
@@ -3308,12 +3304,10 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
                     handleSelectionChange();
                 }
                 return;
-            }
-            else {
+            } else {
                 speed = 100. * m_model->getClipSpeed(mainClipId);
             }
-        }
-        else {
+        } else {
             speed = 100.;
         }
     }
@@ -3375,17 +3369,14 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
             speed = firstSpeed;
             if (isCommonDuration) {
                 duration = firstDuration;
-            }
-            else {
+            } else {
                 duration = 0; // don't show duration in dialog
             }
-        }
-        else {
+        } else {
             speed = 100.;
             if (isCommonOriginalDuration) {
                 duration = firstOriginalDuration;
-            }
-            else {
+            } else {
                 duration = 0; // don't show duration in dialog
             }
         }
@@ -3394,9 +3385,8 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
         }
     }
     qDebug() << "Requesting dialog with speed " << speed << " min " << minSpeed << " and max " << maxSpeed;
-    QScopedPointer<SpeedDialog> d(
-        new SpeedDialog(QApplication::activeWindow(), std::abs(speed), duration, minSpeed, maxSpeed, speed < 0, pitchCompensate, isTimeLineOrPlaylistClip, isSingleOrPartnerClip)
-    );
+    QScopedPointer<SpeedDialog> d(new SpeedDialog(QApplication::activeWindow(), std::abs(speed), duration, minSpeed, maxSpeed, speed < 0, pitchCompensate,
+                                                  isTimeLineOrPlaylistClip, isSingleOrPartnerClip));
     if (d->exec() != QDialog::Accepted) {
         Q_EMIT regainFocus();
         return;
@@ -3406,8 +3396,8 @@ void TimelineController::changeItemSpeed(int clipId, double speed)
     pitchCompensate = d->getPitchCompensate();
     for (int cid : sel) {
         qDebug() << "Requesting speed " << speed << " for clip " << cid << "from dialog";
-    
-        bool res = m_model->requestClipTimeWarp(cid, speed/100.0, pitchCompensate, true, undo, redo);
+
+        bool res = m_model->requestClipTimeWarp(cid, speed / 100.0, pitchCompensate, true, undo, redo);
         if (!res) {
             undo();
             pCore->displayMessage(i18n("Cannot change speed of item(s)"), ErrorMessage, 500);
@@ -5437,22 +5427,18 @@ QColor TimelineController::getDefaultClipColor(ClipType::ProducerType type) cons
     case ClipType::Audio:
         return KdenliveSettings::thumbColor1().darker(150);
     case ClipType::Text:
-    case ClipType::TextTemplate:
-    {
+    case ClipType::TextTemplate: {
         QColor base = scheme.foreground(KColorScheme::LinkText).color();
         QColor high = scheme.foreground(KColorScheme::NegativeText).color();
-        return QColor(qBound(0, base.red() + int(high.red() - 128), 255),
-                      qBound(0, base.green() + int(high.green() - 128), 255),
+        return QColor(qBound(0, base.red() + int(high.red() - 128), 255), qBound(0, base.green() + int(high.green() - 128), 255),
                       qBound(0, base.blue() + int(high.blue() - 128), 255), 255);
     }
     case ClipType::Image:
         return scheme.foreground(KColorScheme::NeutralText).color();
-    case ClipType::SlideShow:
-    {
+    case ClipType::SlideShow: {
         QColor base = scheme.foreground(KColorScheme::LinkText).color();
         QColor high = scheme.foreground(KColorScheme::NeutralText).color();
-        return QColor(qBound(0, base.red() + int(high.red() - 128), 255),
-                      qBound(0, base.green() + int(high.green() - 128), 255),
+        return QColor(qBound(0, base.red() + int(high.red() - 128), 255), qBound(0, base.green() + int(high.green() - 128), 255),
                       qBound(0, base.blue() + int(high.blue() - 128), 255), 255);
     }
     default:
@@ -5462,7 +5448,7 @@ QColor TimelineController::getDefaultClipColor(ClipType::ProducerType type) cons
 
 QColor TimelineController::getTimelineClipColor(ClipType::ProducerType type) const
 {
-    switch(type) {
+    switch (type) {
     case ClipType::Video:
     case ClipType::AV:
         if (KdenliveSettings::videoColor().alpha() > 0) {

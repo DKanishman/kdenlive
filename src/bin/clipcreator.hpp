@@ -88,11 +88,13 @@ QString createSlideshowClip(
    @param path : path to the file
    @param parentFolder: the binId of the containing folder
    @param model: a shared pointer to the bin item model
+   @param suppressTranscodeDialog defer VFR/non-seekable conversion to the caller, preserving native needs-transcode metadata
    @return the binId of the created clip
 */
 QString createClipFromFile(
     const QString &path, const QString &parentFolder, const std::shared_ptr<ProjectItemModel> &model, Fun &undo, Fun &redo,
-    const std::function<void(const QString &)> &readyCallBack = [](const QString &) {}, const bool &updateShouldCheckProfile = false);
+    const std::function<void(const QString &)> &readyCallBack = [](const QString &) {}, const bool &updateShouldCheckProfile = false,
+    bool suppressTranscodeDialog = false);
 bool createClipFromFile(const QString &path, const QString &parentFolder, std::shared_ptr<ProjectItemModel> model);
 
 /** @brief Iterates recursively through the given url list and add the files it finds, recreating a folder structure

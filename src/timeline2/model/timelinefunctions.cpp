@@ -6,6 +6,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 
 #include "timelinefunctions.hpp"
+#include "assets/keyframes/model/keyframemodel.hpp"
+#include "assets/keyframes/model/keyframemodellist.hpp"
 #include "bin/bin.h"
 #include "bin/model/markerlistmodel.hpp"
 #include "bin/model/subtitlemodel.hpp"
@@ -27,6 +29,11 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "timelineitemmodel.hpp"
 #include "trackmodel.hpp"
 #include "transitions/transitionsrepository.hpp"
+#include "utils/qcolorutils.h"
+#include <cfloat>
+#include <limits>
+#include <mlt++/MltAnimation.h>
+#include <set>
 
 #include <KIO/RenameDialog>
 #include <KLocalizedString>
@@ -34,6 +41,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QApplication>
 #include <QDebug>
 #include <QInputDialog>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QScopedValueRollback>
 #include <QSemaphore>
 #include <unordered_map>
@@ -78,6 +87,92 @@ int spacerMinPosition(-1);
 int spacerMaxPosition(-1);
 QSemaphore semaphore(1);
 
+namespace {
+// A resize deliberately retimes short wipe/slide transitions. Cutting must
+// instead preserve the source animation on each retained frame.
+paramVector compositionParametersInRange(const std::shared_ptr<CompositionModel> &composition, int first, int last)
+{
+    paramVector result = composition->getAllParameters();
+    const int length = composition->getPlaytime();
+    const auto animated = composition->getKeyframableParameters();
+    for (auto &parameter : result) {
+        const auto metadata = animated.constFind(parameter.first);
+        const bool specialRect = (composition->getAssetId() == QLatin1String("wipe") && parameter.first == QLatin1String("geometry")) ||
+                                 (composition->getAssetId() == QLatin1String("slide") && parameter.first == QLatin1String("rect"));
+        if (metadata == animated.cend() && !specialRect) continue;
+        const ParamType type = specialRect ? ParamType::AnimatedRect : metadata->first;
+        const QString original = parameter.second.toString();
+        if (type == ParamType::Roto_spline) {
+            composition->prepareKeyframes();
+            const auto keyframes = composition->getKeyframeModel();
+            const auto index = composition->getParamIndexFromName(parameter.first);
+            QJsonObject values;
+            for (int frame = first; frame <= last; ++frame)
+                values.insert(QString::number(frame - first), QJsonValue::fromVariant(keyframes->getInterpolatedValue(frame, index)));
+            parameter.second = QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact));
+            continue;
+        }
+        Mlt::Properties source;
+        composition->passProperties(source);
+        source.set("value", original.toUtf8().constData());
+        const bool rectangle =
+            type == ParamType::AnimatedRect || type == ParamType::AnimatedFakeRect || type == ParamType::AnimatedPoint || type == ParamType::AnimatedFakePoint;
+        const bool point = type == ParamType::AnimatedPoint || type == ParamType::AnimatedFakePoint;
+        if (rectangle)
+            (void)source.anim_get_rect("value", first, length);
+        else if (type == ParamType::Color)
+            (void)source.anim_get_color("value", first, length);
+        else
+            (void)source.anim_get_double("value", first, length);
+        Mlt::Animation animation(source.get_animation("value"));
+        if (!animation.is_valid() || animation.key_count() < 2) continue;
+        std::set<int> frames{first, last};
+        bool nonlinear = false;
+        for (int i = 0; i < animation.key_count(); ++i) {
+            const int frame = animation.key_get_frame(i);
+            if (frame > first && frame < last) frames.insert(frame);
+            const auto interpolation = animation.key_get_type(i);
+            nonlinear |= interpolation != mlt_keyframe_linear && interpolation != mlt_keyframe_discrete;
+        }
+        // Cropping an easing curve changes its endpoints (and smooth curves'
+        // neighbours). Native frame samples keep its exact rendered values.
+        if (nonlinear)
+            for (int frame = first + 1; frame < last; ++frame)
+                frames.insert(frame);
+        QStringList keys;
+        const bool percentages = original.contains(QLatin1Char('%'));
+        for (int frame : frames) {
+            QString value;
+            if (rectangle) {
+                const auto rect = source.anim_get_rect("value", frame, length);
+                QStringList components;
+                const auto append = [&](double component) {
+                    if (component != DBL_MIN)
+                        components.append(QString::number(component * (percentages ? 100. : 1.), 'g', 17) + (percentages ? QStringLiteral("%") : QString()));
+                };
+                append(rect.x);
+                append(rect.y);
+                if (!point) {
+                    append(rect.w);
+                    append(rect.h);
+                    append(rect.o);
+                }
+                value = components.join(QLatin1Char(' '));
+            } else if (type == ParamType::Color) {
+                const auto color = source.anim_get_color("value", frame, length);
+                value = QColorUtils::colorToString(QColor(color.r, color.g, color.b, color.a), true);
+            } else {
+                value = QString::number(source.anim_get_double("value", frame, length), 'g', 17);
+            }
+            const auto interpolation = nonlinear ? mlt_keyframe_linear : animation.keyframe_type(frame);
+            keys.append(QString::number(frame - first) + KeyframeModel::getSeparatorForKeyframeType(interpolation) + QLatin1Char('=') + value);
+        }
+        parameter.second = keys.join(QLatin1Char(';'));
+    }
+    return result;
+}
+} // namespace
+
 bool TimelineFunctions::cloneClip(const std::shared_ptr<TimelineItemModel> &timeline, int clipId, int &newId, PlaylistState::ClipState state, int audioStream,
                                   Fun &undo, Fun &redo)
 {
@@ -96,15 +191,117 @@ bool TimelineFunctions::cloneClip(const std::shared_ptr<TimelineItemModel> &time
     // copy useful timeline properties
     timeline->m_allClips[clipId]->passTimelineProperties(timeline->m_allClips[newId]);
 
-    int duration = timeline->getClipPlaytime(clipId);
-    int init_duration = timeline->getClipPlaytime(newId);
-    if (duration != init_duration) {
-        init_duration -= timeline->m_allClips[clipId]->getIn();
-        res = res && timeline->requestItemResize(newId, init_duration, false, true, undo, redo);
-        res = res && timeline->requestItemResize(newId, duration, true, true, undo, redo);
+    const auto source = timeline->m_allClips[clipId];
+    const auto copy = timeline->m_allClips[newId];
+    // A remapped output may exceed its finite source. Enable its native
+    // producer before range changes; native resize edits mapping keys, so the
+    // complete source configuration is applied after the final range is set.
+    if (source->hasTimeRemap() && !timeline->requestClipTimeRemap(newId, true, undo, redo)) return false;
+
+    const auto sourceRange = timeline->getClipInOut(clipId);
+    const int duration = timeline->getClipPlaytime(clipId);
+    if (timeline->getClipInOut(newId) != sourceRange) {
+        // Equal durations do not imply equal source ranges. Reserve the full
+        // source interval before importing effects, so resize cannot trim or
+        // shift the copied keyframes. Newly created native cuts start at zero.
+        if (sourceRange.first < 0 || sourceRange.second < sourceRange.first || sourceRange.second == std::numeric_limits<int>::max() ||
+            timeline->m_allClips[newId]->getIn() != 0) {
+            return false;
+        }
+        int fullDuration = sourceRange.second + 1;
+        if (copy->m_endlessResize || copy->hasTimeRemap()) {
+            // An unplanted remap cut otherwise clamps to input length. Its
+            // output chain is private to this clip, so reserve its output bounds
+            // without changing the finite input. Own endless shared-master
+            // growth here too, before native resize, for exact undo/rollback.
+            const auto producer = timeline->getClipProducer(newId);
+            const auto master = std::make_shared<Mlt::Producer>(producer->parent());
+            const int oldLength = master->get_length(), oldOut = master->get_out(), oldCutLength = producer->get_length();
+            if (fullDuration > oldLength) {
+                Fun boundsRedo = [copy, fullDuration, oldOut] {
+                    // Enabling remap on redo may create a new private chain.
+                    // Always update the clip's current native producer.
+                    const auto current = copy->getProducer();
+                    current->parent().set("length", fullDuration);
+                    current->parent().set("out", qMax(oldOut, fullDuration - 1));
+                    current->set("length", fullDuration);
+                    return true;
+                };
+                Fun boundsUndo = [copy, oldLength, oldOut, oldCutLength] {
+                    const auto current = copy->getProducer();
+                    current->parent().set("length", oldLength);
+                    current->parent().set("out", oldOut);
+                    current->set("length", oldCutLength);
+                    return true;
+                };
+                boundsRedo();
+                UPDATE_UNDO_REDO_NOLOCK(boundsRedo, boundsUndo, undo, redo);
+            }
+        }
+        res = timeline->requestItemResize(newId, fullDuration, true, true, undo, redo);
+        if (res && timeline->m_allClips[newId]->m_endlessResize) {
+            // Endless resize deliberately canonicalizes the in point to zero.
+            // Imported projects may retain a nonzero range; preserve it through
+            // the native setter while the copy is unplanted and has no effects.
+            const auto copy = timeline->m_allClips[newId];
+            const auto previous = timeline->getClipInOut(newId);
+            Fun rangeRedo = [copy, sourceRange] {
+                copy->setInOut(sourceRange.first, sourceRange.second);
+                return copy->getIn() == sourceRange.first && copy->getOut() == sourceRange.second;
+            };
+            Fun rangeUndo = [copy, previous] {
+                copy->setInOut(previous.first, previous.second);
+                return true;
+            };
+            res = rangeRedo();
+            if (res) {
+                UPDATE_UNDO_REDO_NOLOCK(rangeRedo, rangeUndo, undo, redo);
+            } else {
+                rangeUndo();
+            }
+        } else if (res) {
+            int requestedDuration = duration;
+            res = timeline->requestItemResize(newId, requestedDuration, false, true, undo, redo);
+        }
     }
-    if (!res) {
+    if (!res || timeline->getClipInOut(newId) != sourceRange || timeline->getClipPlaytime(newId) != duration) {
         return false;
+    }
+    if (source->hasTimeRemap()) {
+        const auto remapValues = [](const std::shared_ptr<ClipModel> &clip) {
+            QMap<QString, QString> values;
+            const auto producer = clip->getProducer();
+            Mlt::Chain chain(producer->parent());
+            for (int row = 0; row < chain.link_count(); ++row) {
+                std::unique_ptr<Mlt::Link> link(chain.link(row));
+                if (!link || !link->is_valid() || QString::fromUtf8(link->get("mlt_service")) != QLatin1String("timeremap")) continue;
+                // getRemapValues serializes only to producer length; that can
+                // cut off valid keys on an output longer than its input.
+                const char *map = link->property_exists("time_map") ? link->get("time_map") : link->get("map");
+                values.insert(QStringLiteral("time_map"), QString::fromUtf8(map));
+                values.insert(QStringLiteral("pitch"), QString::fromUtf8(link->get("pitch")));
+                values.insert(QStringLiteral("image_mode"), QString::fromUtf8(link->get("image_mode")));
+                break;
+            }
+            return values;
+        };
+        const auto previous = remapValues(copy), next = remapValues(source);
+        if (next.isEmpty()) return false;
+        Fun mapUndo = [copy, previous] {
+            for (auto i = previous.cbegin(); i != previous.cend(); ++i)
+                copy->setRemapValue(i.key(), i.value());
+            return true;
+        };
+        Fun mapRedo = [copy, next, remapValues] {
+            for (auto i = next.cbegin(); i != next.cend(); ++i)
+                copy->setRemapValue(i.key(), i.value());
+            return remapValues(copy) == next;
+        };
+        if (!mapRedo()) {
+            mapUndo();
+            return false;
+        }
+        UPDATE_UNDO_REDO_NOLOCK(mapRedo, mapUndo, undo, redo);
     }
     std::shared_ptr<EffectStackModel> sourceStack = timeline->getClipEffectStackModel(clipId);
     std::shared_ptr<EffectStackModel> destStack = timeline->getClipEffectStackModel(newId);
@@ -122,8 +319,9 @@ bool TimelineFunctions::requestMultipleClipsInsertion(const std::shared_ptr<Time
         for (const QString &binId : binIds) {
             binIdsString += (binId + ";");
         }
-        QVariantList result = timeline->clipAudioStreamInfo(binIdsString, trackId, true, undo, redo); // This will prompt track creation if needed and log undo/redo for it
-        if(result[0].toInt() == -1) {
+        QVariantList result =
+            timeline->clipAudioStreamInfo(binIdsString, trackId, true, undo, redo); // This will prompt track creation if needed and log undo/redo for it
+        if (result[0].toInt() == -1) {
             // User cancelled track creation or failed
             undo();
             return false;
@@ -150,6 +348,49 @@ bool TimelineFunctions::requestMultipleClipsInsertion(const std::shared_ptr<Time
 
 bool TimelineFunctions::processClipCut(const std::shared_ptr<TimelineItemModel> &timeline, int clipId, int position, int &newId, Fun &undo, Fun &redo)
 {
+    if (timeline->isComposition(clipId)) {
+        const auto original = timeline->m_allCompositions.at(clipId);
+        const int start = original->getPosition(), duration = original->getPlaytime();
+        if (position <= start || position >= start + duration) return false;
+        const int trackId = original->getCurrentTrackId();
+        if (trackId < 0 || timeline->trackIsLocked(trackId)) return false;
+        const auto before = original->getAllParameters();
+        const auto left = compositionParametersInRange(original, 0, position - start - 1);
+        const auto right = compositionParametersInRange(original, position - start, duration - 1);
+        const int forcedTrack = original->getForcedTrack();
+        auto properties = std::make_unique<Mlt::Properties>();
+        properties->set("force_track", original->getAsset()->get_int("force_track"));
+        for (const auto &parameter : right)
+            properties->set(parameter.first.toUtf8().constData(), parameter.second.toString().toUtf8().constData());
+        Fun resizeUndo = [] { return true; }, resizeRedo = [] { return true; };
+        int leftLength = position - start;
+        if (!timeline->requestItemResize(clipId, leftLength, true, true, resizeUndo, resizeRedo)) return false;
+        original->setParameters(left);
+        Fun restore = [original, before, resizeUndo]() {
+            if (!resizeUndo()) return false;
+            original->setParameters(before);
+            return true;
+        };
+        Fun shorten = [original, left, resizeRedo]() {
+            if (!resizeRedo()) return false;
+            original->setParameters(left);
+            return true;
+        };
+        Fun localUndo = [] { return true; }, localRedo = [] { return true; };
+        UPDATE_UNDO_REDO_NOLOCK(shorten, restore, localUndo, localRedo);
+        if (!timeline->requestCompositionInsertion(original->getAssetId(), trackId, forcedTrack, position, start + duration - position, std::move(properties),
+                                                   newId, localUndo, localRedo, true)) {
+            const bool restored = localUndo();
+            Q_ASSERT(restored);
+            return false;
+        }
+        const auto fragment = timeline->m_allCompositions.at(newId);
+        fragment->setParameters(right);
+        fragment->setHidden(original->isHidden());
+        fragment->setShowKeyframes(original->showKeyframes());
+        UPDATE_UNDO_REDO_NOLOCK(localRedo, localUndo, undo, redo);
+        return true;
+    }
     bool isSubtitle = timeline->isSubTitle(clipId);
     int trackId = isSubtitle ? -1 : timeline->getClipTrackId(clipId);
     int trackDuration = isSubtitle ? -1 : timeline->getTrackById_const(trackId)->trackDuration();
@@ -301,10 +542,10 @@ bool TimelineFunctions::requestClipCut(const std::shared_ptr<TimelineItemModel> 
             clips.insert(cid);
             continue;
         }
-        if (!timeline->isClip(cid)) {
+        if (!timeline->isClip(cid) && !timeline->isComposition(cid)) {
             continue;
         }
-        int tk = timeline->getClipTrackId(cid);
+        int tk = timeline->getItemTrackId(cid);
         if (tk != -1 && !timeline->getTrackById_const(tk)->isLocked()) {
             clips.insert(cid);
         }
@@ -339,7 +580,7 @@ bool TimelineFunctions::requestClipCut(const std::shared_ptr<TimelineItemModel> 
     QList<int> clipsToCut;
     bool subtitleItemSelected = false;
     for (int cid : clips) {
-        if (!timeline->isClip(cid) && !timeline->isSubTitle(cid)) {
+        if (!timeline->isClip(cid) && !timeline->isSubTitle(cid) && !timeline->isComposition(cid)) {
             continue;
         }
         int start = timeline->getItemPosition(cid);
@@ -937,7 +1178,7 @@ bool TimelineFunctions::insertZone(const std::shared_ptr<TimelineItemModel> &tim
                 const QList<int> audioTracksBefore = timeline->getTracksIds(true);
                 // prompt user to insert audio stream if needed.
                 QVariantList streamInfo = timeline->clipAudioStreamInfo(binClipId, trackIds.first(), true, undo, redo);
-                if(streamInfo[0].toInt() == -1) {
+                if (streamInfo[0].toInt() == -1) {
                     // User cancelled track creation
                     return false;
                 }
@@ -958,6 +1199,14 @@ bool TimelineFunctions::insertZone(const std::shared_ptr<TimelineItemModel> &tim
 bool TimelineFunctions::liftZone(const std::shared_ptr<TimelineItemModel> &timeline, int trackId, QPoint zone, Fun &undo, Fun &redo)
 {
     // TODO : Cut subtitle tracks
+    if (!timeline->isTrack(trackId) || timeline->trackIsLocked(trackId) || zone.x() < 0 || zone.y() <= zone.x()) return false;
+    for (int boundary : {zone.x(), zone.y()}) {
+        const int composition = timeline->getCompositionByPosition(trackId, boundary);
+        if (composition >= 0 && timeline->getItemPosition(composition) < boundary &&
+            timeline->getItemPosition(composition) + timeline->getItemPlaytime(composition) > boundary &&
+            !TimelineFunctions::requestClipCut(timeline, composition, boundary, undo, redo))
+            return false;
+    }
     // Check if there is a clip at start point
     int startClipId = timeline->getClipByPosition(trackId, zone.x());
     if (startClipId > -1) {
@@ -1082,6 +1331,19 @@ bool TimelineFunctions::requestInsertSpace(const std::shared_ptr<TimelineItemMod
     timeline->requestClearSelection();
     Fun local_undo = []() { return true; };
     Fun local_redo = []() { return true; };
+    if (zone.x() < 0 || zone.y() <= zone.x()) return false;
+    const auto tracks = allowedTracks.isEmpty() ? timeline->getAllTracksIds() : std::unordered_set<int>(allowedTracks.begin(), allowedTracks.end());
+    for (int track : tracks) {
+        if (!timeline->isTrack(track) || timeline->trackIsLocked(track)) continue;
+        const int composition = timeline->getCompositionByPosition(track, zone.x());
+        if (composition >= 0 && timeline->getItemPosition(composition) < zone.x() &&
+            timeline->getItemPosition(composition) + timeline->getItemPlaytime(composition) > zone.x() &&
+            !TimelineFunctions::requestClipCut(timeline, composition, zone.x(), local_undo, local_redo)) {
+            const bool restored = local_undo();
+            Q_ASSERT(restored);
+            return false;
+        }
+    }
     std::unordered_set<int> items;
     if (allowedTracks.isEmpty()) {
         // Select clips in all tracks
@@ -1999,7 +2261,8 @@ bool TimelineFunctions::pasteClips(const std::shared_ptr<TimelineItemModel> &tim
     return false;
 }
 
-bool TimelineFunctions::getUsedTracks(const QDomNodeList &clips, const QDomNodeList &compositions, int sourceMasterTrack, int &topAudioMirror, TimelineTracksInfo &allTracks, QList<int> &singleAudioTracks, std::unordered_map<int, int> &audioMirrors)
+bool TimelineFunctions::getUsedTracks(const QDomNodeList &clips, const QDomNodeList &compositions, int sourceMasterTrack, int &topAudioMirror,
+                                      TimelineTracksInfo &allTracks, QList<int> &singleAudioTracks, std::unordered_map<int, int> &audioMirrors)
 {
     // Tracks used by clips
     int max = clips.count();
@@ -2110,7 +2373,7 @@ bool TimelineFunctions::pasteClips(const std::shared_ptr<TimelineItemModel> &tim
     // Number of required video tracks with mirror
     int topAudioMirror = 0;
 
-    if(!getUsedTracks(clips, compositions, sourceMasterTrack, topAudioMirror, sourceTracks, singleAudioTracks, audioMirrors)) {
+    if (!getUsedTracks(clips, compositions, sourceMasterTrack, topAudioMirror, sourceTracks, singleAudioTracks, audioMirrors)) {
         return false;
     }
 
@@ -3239,10 +3502,8 @@ bool TimelineFunctions::addMarkersAtGapsOnTrack(const std::shared_ptr<TimelineIt
     }
     std::unordered_set<int> clipSet = track->getClipsInRange(0, -1);
     std::vector<int> clips(clipSet.begin(), clipSet.end());
-    std::sort(clips.begin(), clips.end(), [&](int a, int b) {
-        return timeline->getClipPosition(a) < timeline->getClipPosition(b);
-    });
-    std::vector<std::pair<int,int>> gaps;
+    std::sort(clips.begin(), clips.end(), [&](int a, int b) { return timeline->getClipPosition(a) < timeline->getClipPosition(b); });
+    std::vector<std::pair<int, int>> gaps;
     for (int i = 0; i < (int)clips.size() - 1; i++) {
         int clipEnd = timeline->getClipEnd(clips[i]);
         int nextStart = timeline->getClipPosition(clips[i + 1]);

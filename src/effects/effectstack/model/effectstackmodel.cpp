@@ -5,13 +5,16 @@
 #include "effectstackmodel.hpp"
 #include "assets/keyframes/model/keyframemodellist.hpp"
 #include "assets/model/assetcommand.hpp"
+#include "bin/model/subtitlemodel.hpp"
 #include "core.h"
 #include "doc/docundostack.hpp"
+#include "doc/kdenlivedoc.h"
 #include "effectgroupmodel.hpp"
 #include "effectitemmodel.hpp"
 #include "effects/effectsrepository.hpp"
 #include "macros.hpp"
 #include "mainwindow.h"
+#include "timeline2/model/timelineitemmodel.hpp"
 #include "timeline2/model/timelinemodel.hpp"
 #include <profiles/profilemodel.hpp>
 #include <stack>
@@ -1511,7 +1514,18 @@ void EffectStackModel::importEffects(const std::weak_ptr<Mlt::Service> &service,
                     if (!style.isEmpty()) {
                         subProperties.insert(QStringLiteral("av.force_style"), style);
                     }
-                    pCore->window()->slotInitSubtitle(subProperties, uuid);
+                    if (pCore->window()) {
+                        pCore->window()->slotInitSubtitle(subProperties, uuid);
+                    } else if (auto *document = pCore->currentDoc()) {
+                        // Native project loading also runs without editor widgets
+                        // (tests and verification). Initialize the actual owning
+                        // model without invoking the GUI subtitle panel.
+                        if (const auto timeline = document->getTimeline(uuid, true)) {
+                            timeline->createSubtitleModel()->loadProperties(subProperties);
+                        } else {
+                            qWarning() << "Cannot restore subtitles without their owning timeline" << uuid;
+                        }
+                    }
                 } else if (auto ms = m_masterService.lock()) {
                     ms->attach(*filter.get());
                 }

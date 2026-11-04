@@ -10,8 +10,10 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "bin/projectclip.h"
 #include "bin/projectitemmodel.h"
 #include "core.h"
+#include "doc/kdenlivedoc.h"
 #include "effects/effectstack/model/effectstackmodel.hpp"
 #include "kdenlivesettings.h"
+#include "timeline2/model/timelineitemmodel.hpp"
 #include "xml/xml.hpp"
 
 #include <mlt++/MltConsumer.h>
@@ -21,6 +23,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <mlt++/MltProfile.h>
 
 #include <QProcess>
+#include <QScopeGuard>
 #include <QThread>
 
 #include <KLocalizedString>
@@ -40,6 +43,19 @@ FilterTask::FilterTask(const ObjectId &owner, const QString &binId, const std::w
     , m_consumerArgs(consumerArgs)
 {
     m_description = i18n("Processing filter %1", m_assetId);
+    // Resolve the explicit owning sequence on the caller's GUI thread. The
+    // worker must not depend on which editor tab is active when it starts.
+    if (m_owner.type == KdenliveObjectType::TimelineClip && pCore && pCore->currentDoc()) {
+        const auto timeline = pCore->currentDoc()->getTimeline(m_owner.uuid, true);
+        if (timeline && timeline->isClip(m_owner.itemId)) m_sourceEffects = timeline->getClipEffectStackModel(m_owner.itemId);
+    }
+}
+
+FilterTask::~FilterTask()
+{
+    // TaskManager can remove queued tasks from the pool without ever calling
+    // run(). They still owe observers one terminal cancellation notification.
+    if (!m_hasRun.load()) Q_EMIT analysisFinished(false, true, QString(), QString());
 }
 
 void FilterTask::start(const ObjectId &owner, const QString &binId, const std::weak_ptr<AssetParameterModel> &model, const QString &assetId, int in, int out,
@@ -54,7 +70,13 @@ void FilterTask::start(const ObjectId &owner, const QString &binId, const std::w
 
 void FilterTask::run()
 {
+    m_hasRun.store(true);
     AbstractTaskDone whenFinished(m_owner.itemId, this);
+    bool analysisSucceeded = false;
+    QString analysisKey, analysisResult;
+    const auto notifyCompletion = qScopeGuard([this, &analysisSucceeded, &analysisKey, &analysisResult] {
+        Q_EMIT analysisFinished(analysisSucceeded && !m_isCanceled, bool(m_isCanceled), analysisKey, analysisResult);
+    });
     if (m_isCanceled || pCore->taskManager.isBlocked()) {
         return;
     }
@@ -102,6 +124,7 @@ void FilterTask::run()
                     QMetaObject::invokeMethod(pCore.get(), "displayBinMessage", Qt::QueuedConnection,
                                               Q_ARG(QString, i18n("Cannot process file %1", binClip->url())), Q_ARG(int, int(KMessageWidget::Warning)));
                 }
+                return;
             }
             if (m_outPoint == -1) {
                 if (binClip->clipType() == ClipType::Timeline) {
@@ -130,8 +153,10 @@ void FilterTask::run()
                 }
             }
             if (m_owner.type == KdenliveObjectType::TimelineClip) {
-                // Add the timeline clip effects
-                std::shared_ptr<EffectStackModel> stack = pCore->getItemEffectStack(pCore->currentTimelineId(), int(m_owner.type), m_owner.itemId);
+                // The GUI facade may be absent in native tests, and the active
+                // sequence may have changed since this job was queued.
+                const auto stack = m_sourceEffects.lock();
+                if (!stack) return;
                 stack->passEffects(producer.get(), m_assetId);
             }
         }
@@ -299,7 +324,7 @@ void FilterTask::run()
     QObject::connect(m_jobProcess, &QProcess::readyReadStandardError, this, &FilterTask::processLogInfo);
     m_jobProcess->start(KdenliveSettings::meltpath(), args);
     m_jobProcess->waitForFinished(-1);
-    bool result = m_jobProcess->exitStatus() == QProcess::NormalExit;
+    bool result = m_jobProcess->exitStatus() == QProcess::NormalExit && m_jobProcess->exitCode() == 0;
     m_jobProcess->deleteLater();
     m_progress = 100;
     if (auto ptr = m_model.lock()) {
@@ -314,12 +339,13 @@ void FilterTask::run()
     }
 
     paramVector params;
-    QString key("results");
+    QString &key = analysisKey;
+    key = QStringLiteral("results");
     if (m_filterData.find(QStringLiteral("key")) != m_filterData.end()) {
         key = m_filterData.at(QStringLiteral("key"));
     }
 
-    QString resultData;
+    QString &resultData = analysisResult;
     if (Xml::docContentFromFile(dom, destFile.fileName(), false)) {
         QDomNodeList filters = dom.elementsByTagName(QLatin1String("filter"));
         for (int i = 0; i < filters.count(); ++i) {
@@ -359,7 +385,8 @@ void FilterTask::run()
     }
     if (auto ptr = m_model.lock()) {
         qDebug() << "===== SETTING FILTER PARAM: " << params;
-        QMetaObject::invokeMethod(ptr.get(), "setParametersFromTask", Q_ARG(paramVector, std::move(params)));
+        const bool enqueued = QMetaObject::invokeMethod(ptr.get(), "setParametersFromTask", Q_ARG(paramVector, std::move(params)));
+        analysisSucceeded = enqueued && !resultData.isEmpty();
     }
 }
 

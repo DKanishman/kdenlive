@@ -6731,6 +6731,13 @@ bool TimelineModel::checkConsistency(const std::vector<int> &guideSnaps)
             snaps[clip->getPosition() + clip->getPlaytime()] += 1;
         }
     }
+    if (m_subtitleModel) {
+        std::vector<int> subtitleSnaps;
+        m_subtitleModel->allSnaps(subtitleSnaps);
+        for (int position : subtitleSnaps) {
+            snaps[position] += 1;
+        }
+    }
     for (auto p : guideSnaps) {
         snaps[p] += 1;
     }

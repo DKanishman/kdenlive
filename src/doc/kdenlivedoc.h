@@ -132,7 +132,10 @@ public:
     /** @brief Returns the project file xml. */
     QDomDocument xmlSceneList(const QString &scene);
     /** @brief Saves the project file xml to a file. */
-    bool saveSceneList(const QString &path, const QString &scene, bool saveOverExistingFile = true);
+    // Supplying errorMessage selects noninteractive saving to a new path only.
+    // refuseOverwrite uses the same non-replacing publication with ordinary interactive error reporting.
+    bool saveSceneList(const QString &path, const QString &scene, bool saveOverExistingFile = true, QString *errorMessage = nullptr,
+                       bool refuseOverwrite = false);
     void setProjectFolder(const QUrl &url);
     void setZone(const QUuid &uuid, int start, int end);
     QPoint zone(const QUuid &uuid) const;
@@ -235,8 +238,12 @@ public:
     void cleanupTimelinePreview(const QDateTime &documentDate);
     /** @brief Returns the guides categories for the project in format {name:index:#color} */
     const QStringList guidesCategories();
-    /** @brief Set the guides categories for the project in format {name:index:#color} */
-    void updateGuideCategories(const QStringList &categories, const QMap<int, int> remapCategories = {});
+    /** @brief Change project-wide categories and all source/sequence markers in one undo.
+     *  Removed categories without a mapping delete their markers. Application defaults are
+     *  unchanged: the current default category must be retained. Unready models or pending
+     *  legacy guides reject the operation without changing the project or undo/redo history.
+     */
+    bool updateGuideCategories(const QStringList &categories, const QMap<int, int> remapCategories = {});
 
     /**
      * If the document used a decimal point different than “.”, it is stored in this property.

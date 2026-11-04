@@ -10,6 +10,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #include <KMessageWidget>
 #include <QFuture>
+#include <QPointer>
 #include <QThread>
 
 TaskManager::TaskManager(QObject *parent)
@@ -181,6 +182,26 @@ void TaskManager::discardJob(const ObjectId &owner, const QUuid &uuid)
         }
         ix--;
     }
+}
+
+bool TaskManager::requestCancellation(const ObjectId &owner, AbstractTask::JOBTYPE type)
+{
+    // QObject deletion is queued to this thread by taskDone. Do not hold the task
+    // list lock while cancelJob emits signals, or wait on a worker's run mutex.
+    if (QThread::currentThread() != thread()) return false;
+    QList<QPointer<AbstractTask>> tasks;
+    {
+        QReadLocker lock(&m_tasksListLock);
+        if (m_blockUpdates) return false;
+        const auto found = m_taskList.find(owner.itemId);
+        if (found == m_taskList.end()) return false;
+        for (auto *task : found->second)
+            if (task->ownerId() == owner && (type == AbstractTask::NOJOBTYPE || task->m_type == type)) tasks.append(task);
+    }
+    bool requested = false;
+    for (const auto &task : tasks)
+        if (task) requested = task->cancelJob() || requested;
+    return requested;
 }
 
 bool TaskManager::hasPendingJob(const ObjectId &owner, AbstractTask::JOBTYPE type) const

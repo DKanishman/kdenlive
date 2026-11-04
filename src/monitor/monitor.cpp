@@ -855,6 +855,17 @@ void Monitor::buildBackgroundedProducer(int pos)
     if (!m_openMutex.tryLock()) {
         return;
     }
+    // The frame's original producer can be the decoder inside an Mlt::Chain,
+    // which does not carry the bin identity of its outer chain. Pass immutable
+    // source/build annotations onto each frame, including composited sources.
+    const QByteArray monitorBinId = m_controller->clipId().toUtf8();
+    const QByteArray monitorGeneration = QUuid::createUuid().toByteArray(QUuid::WithoutBraces);
+    auto annotateMonitorProducer = [&](Mlt::Producer &nativeProducer) {
+        nativeProducer.set("set._kdenlive_monitor_bin_id", monitorBinId.constData());
+        nativeProducer.set("set._kdenlive_monitor_generation", monitorGeneration.constData());
+        nativeProducer.set("set._kdenlive_monitor_request", nullptr);
+        nativeProducer.set("set._kdenlive_monitor_source_hash", nullptr);
+    };
     std::unique_ptr<Mlt::Filter> monitorFilter{nullptr};
     if (m_controller->hasAudio()) {
         auto levelsFilter = getFilter(QStringLiteral("audiolevel"), producer);
@@ -874,12 +885,17 @@ void Monitor::buildBackgroundedProducer(int pos)
         if (monitorFilter) {
             producer->attach(*monitorFilter.get());
         }
-        m_glMonitor->setProducer(producer, isActive(), pos);
+        // A private cut keeps monitor annotations and request markers off the
+        // shared bin master while retaining its live filters and source state.
+        std::shared_ptr<Mlt::Producer> monitorProducer(producer->cut(producer->get_in(), producer->get_out()));
+        annotateMonitorProducer(*monitorProducer);
+        m_glMonitor->setProducer(monitorProducer, isActive(), pos);
     } else {
         // Add background compositing
         Mlt::Tractor trac(pCore->getProjectProfile());
         // Pass the clipId that is used to check identity in some places
         trac.set("kdenlive:id", m_controller->clipId().toLatin1().constData());
+        annotateMonitorProducer(trac);
         QString color = QStringLiteral("color:%1").arg(KdenliveSettings::monitor_background());
         std::shared_ptr<Mlt::Producer> bg(new Mlt::Producer(pCore->getProjectProfile(), color.toUtf8().constData()));
         bg->set("length", maxDuration + 1);

@@ -42,6 +42,10 @@ public:
      */
     void discardJobs(const ObjectId &owner, AbstractTask::JOBTYPE type = AbstractTask::NOJOBTYPE, bool softDelete = false, const QVector<AbstractTask::JOBTYPE> exceptions = {});
     void discardJob(const ObjectId &owner, const QUuid &uuid);
+    /** Request cancellation without waiting for worker completion. Call on this manager's thread.
+     * Tasks remain registered until their normal taskDone notification; query for final state.
+     */
+    bool requestCancellation(const ObjectId &owner, AbstractTask::JOBTYPE type = AbstractTask::NOJOBTYPE);
     void discardJobsByType(AbstractTask::JOBTYPE jobType);
 
     /** @brief Check if there is a pending / running job a clip.

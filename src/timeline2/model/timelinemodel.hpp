@@ -97,6 +97,8 @@ public:
     friend class TrackModel;
     friend class TimelineTabs;
     friend class ProjectManager;
+    friend class KdenliveMcpServer;
+    friend class McpMediaAccess;
     template <typename T> friend class MoveableItem;
     friend class ClipModel;
     friend class ClipDurationDialog;

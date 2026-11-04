@@ -56,7 +56,8 @@ public:
     /** @brief Saves given profile as custom one. If the path is left empty, it will be set to the standard custom_profile directory
      *  @returns The path of the saved folder
      */
-    const QString saveProfile(ProfileInfo *profile, QString profilePath = QString());
+    // errorMessage opts out of modal error dialogs; refuseOverwrite atomically publishes only a new file.
+    const QString saveProfile(ProfileInfo *profile, QString profilePath = QString(), QString *errorMessage = nullptr, bool refuseOverwrite = false);
 
     /** @brief Delete a (custom) profile*/
     bool deleteProfile(const QString &path);

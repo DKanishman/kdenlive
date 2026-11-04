@@ -521,8 +521,15 @@ bool ProjectManager::closeCurrentDocument(bool saveChanges, bool quit)
     return true;
 }
 
-bool ProjectManager::saveFileAs(const QString &outputFileName, bool saveOverExistingFile, bool saveACopy)
+bool ProjectManager::saveFileAs(const QString &outputFileName, bool saveOverExistingFile, bool saveACopy, QString *errorMessage, bool refuseOverwrite)
 {
+    if (errorMessage) {
+        errorMessage->clear();
+        if (!saveACopy || saveOverExistingFile || QFileInfo::exists(outputFileName)) {
+            *errorMessage = i18n("Automated saving requires a new project copy.");
+            return false;
+        }
+    }
     // Disable autosave while saving
     m_autoSaveTimer.stop();
     m_autoSaveChangeCount = 0;
@@ -556,7 +563,7 @@ bool ProjectManager::saveFileAs(const QString &outputFileName, bool saveOverExis
         }
     }
     m_project->updateWorkFilesAfterSave();
-    if (!m_project->saveSceneList(outputFileName, scene, saveOverExistingFile)) {
+    if (!m_project->saveSceneList(outputFileName, scene, saveOverExistingFile, errorMessage, refuseOverwrite)) {
         KNotification::event(QStringLiteral("ErrorMessage"), i18n("Saving project file <br><b>%1</B> failed", outputFileName), QPixmap());
         if (!firstSave) {
             const QString projectFolder = m_project->url().adjusted(QUrl::RemoveFilename | QUrl::StripTrailingSlash).toLocalFile() + QLatin1Char('/');

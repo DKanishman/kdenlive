@@ -6,6 +6,7 @@
 #include "subtitlemodel.hpp"
 #include "config-kdenlive.h"
 #include "core.h"
+#include "doc/docundostack.hpp"
 #include "doc/kdenlivedoc.h"
 #include "kdenlivesettings.h"
 #include "macros.hpp"
@@ -22,7 +23,12 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QScopedValueRollback>
+#include <QSignalBlocker>
 #include <QStringConverter>
+#include <cmath>
+#include <limits>
+#include <set>
 #include <utility>
 
 std::shared_ptr<TimelineItemModel> SubtitleModel::timeline() const
@@ -81,8 +87,6 @@ SubtitleModel::SubtitleModel(std::shared_ptr<TimelineItemModel> timeline, const 
         }
     }
 
-    registerSnap(snapModel);
-
     // Load multiple subtitle data
     QMap<std::pair<int, QString>, QString> multiSubs = pCore->currentDoc()->multiSubtitlePath(timelineUuid);
     m_subtitlesList = multiSubs;
@@ -125,7 +129,9 @@ void SubtitleModel::setup()
     connect(this, &SubtitleModel::columnsRemoved, this, &SubtitleModel::modelChanged);
     connect(this, &SubtitleModel::columnsInserted, this, &SubtitleModel::modelChanged);
     connect(this, &SubtitleModel::rowsMoved, this, &SubtitleModel::modelChanged);
-    connect(this, &SubtitleModel::modelReset, this, &SubtitleModel::modelChanged);
+    connect(this, &SubtitleModel::modelReset, this, [this] {
+        if (!m_languageStateChanging) Q_EMIT modelChanged();
+    });
 }
 
 void SubtitleModel::unsetModel()
@@ -158,40 +164,355 @@ QByteArray SubtitleModel::guessFileEncoding(const QString &file, bool *confidenc
     auto state = prober.feed(sample);
     *confidence = false;
     switch (state) {
-        case KEncodingProber::ProberState::FoundIt:
-            qDebug() << "Guessed subtitle file encoding to be " << prober.encoding() << ", confidence: " << prober.confidence();
-            if (prober.confidence() < 0.6) {
-                return QByteArray("UTF-8");
-            }
-            *confidence = true;
-            break;
-        case KEncodingProber::ProberState::NotMe:
-            qWarning() << "Subtitle file encoding not recognized";
+    case KEncodingProber::ProberState::FoundIt:
+        qDebug() << "Guessed subtitle file encoding to be " << prober.encoding() << ", confidence: " << prober.confidence();
+        if (prober.confidence() < 0.6) {
             return QByteArray("UTF-8");
-        case KEncodingProber::ProberState::Probing:
-            qWarning() << "Subtitle file encoding indeterminate, confidence is" << prober.confidence() << ", ENCODING: " << prober.encoding();
-            if (prober.confidence() < 0.5) {
-                // Encoding cannot be guessed, default to UTF-8
-                return QByteArray(QByteArray("UTF-8"));
-            }
-            break;
+        }
+        *confidence = true;
+        break;
+    case KEncodingProber::ProberState::NotMe:
+        qWarning() << "Subtitle file encoding not recognized";
+        return QByteArray("UTF-8");
+    case KEncodingProber::ProberState::Probing:
+        qWarning() << "Subtitle file encoding indeterminate, confidence is" << prober.confidence() << ", ENCODING: " << prober.encoding();
+        if (prober.confidence() < 0.5) {
+            // Encoding cannot be guessed, default to UTF-8
+            return QByteArray(QByteArray("UTF-8"));
+        }
+        break;
     }
     return prober.encoding();
 }
 
-void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool externalImport, float startFramerate, float targetFramerate, const QByteArray &encoding)
+namespace {
+bool sameImportedStyle(const SubtitleStyle &a, const SubtitleStyle &b)
 {
+    return a.fontName() == b.fontName() && a.fontSize() == b.fontSize() && a.primaryColour() == b.primaryColour() &&
+           a.secondaryColour() == b.secondaryColour() && a.outlineColour() == b.outlineColour() && a.backColour() == b.backColour() && a.bold() == b.bold() &&
+           a.italic() == b.italic() && a.underline() == b.underline() && a.strikeOut() == b.strikeOut() && a.scaleX() == b.scaleX() &&
+           a.scaleY() == b.scaleY() && a.spacing() == b.spacing() && a.angle() == b.angle() && a.borderStyle() == b.borderStyle() &&
+           a.outline() == b.outline() && a.shadow() == b.shadow() && a.alignment() == b.alignment() && a.marginL() == b.marginL() &&
+           a.marginR() == b.marginR() && a.marginV() == b.marginV() && a.encoding() == b.encoding();
+}
+bool validImportedAssStyle(const QString &line)
+{
+    if (!line.startsWith(QStringLiteral("Style:"))) return false;
+    const auto fields = line.section(QLatin1Char(':'), 1).trimmed().split(QLatin1Char(','));
+    if (fields.size() != 23 || fields.at(0).trimmed().isEmpty() || fields.at(1).trimmed().isEmpty()) return false;
+    static const QRegularExpression color(QStringLiteral("^&H[0-9a-fA-F]{8}&?$"), QRegularExpression::CaseInsensitiveOption);
+    for (int index = 2; index < fields.size(); ++index) {
+        if (index >= 3 && index <= 6) {
+            if (!color.match(fields.at(index).trimmed()).hasMatch()) return false;
+        } else {
+            bool valid = false;
+            const double number = fields.at(index).toDouble(&valid);
+            if (!valid || !std::isfinite(number)) return false;
+            if ((index >= 7 && index <= 10) || index == 15 || index >= 18) {
+                fields.at(index).toInt(&valid);
+                if (!valid) return false;
+            }
+        }
+    }
+    return true;
+}
+bool importedAssTime(const QString &value, double fps, double multiplier, GenTime &time)
+{
+    static const QRegularExpression grammar(QStringLiteral("^([0-9]{1,3}):([0-5][0-9]):([0-5][0-9])\\.([0-9]{2})$"));
+    const auto match = grammar.match(value);
+    if (!match.hasMatch() || match.captured(1).toInt() > 596) return false;
+    const qint64 milliseconds = ((match.captured(1).toLongLong() * 60 + match.captured(2).toLongLong()) * 60 + match.captured(3).toLongLong()) * 1000 +
+                                match.captured(4).toLongLong() * 10;
+    const double frames = double(milliseconds) * fps / (1000.0 * multiplier);
+    const double outputMilliseconds = double(milliseconds) / multiplier;
+    if (!std::isfinite(frames) || frames < 0 || frames >= std::numeric_limits<int>::max() || outputMilliseconds >= std::numeric_limits<int>::max())
+        return false;
+    time = SubtitleEvent::stringtoTime(value, fps, multiplier);
+    return true;
+}
+} // namespace
+
+SubtitleModel::ImportMetadata SubtitleModel::captureImportMetadata() const
+{
+    return {m_subtitleStyles, m_scriptInfo, m_defaultStyles, fontSection, m_maxLayer, m_activeSubLayer};
+}
+
+void SubtitleModel::restoreImportMetadata(const ImportMetadata &metadata)
+{
+    // Event maps are intentionally untouched. Older commands and language-state
+    // exchanges retain their original event nodes and native IDs.
+    m_subtitleStyles = metadata.styles;
+    m_scriptInfo = metadata.script;
+    m_defaultStyles = metadata.defaultStyles;
+    fontSection = metadata.fonts;
+    m_maxLayer = metadata.maxLayer;
+    m_activeSubLayer = metadata.activeLayer;
+}
+
+SubtitleModel::ImportResult SubtitleModel::importAssSubtitle(const QString &filePath, int offset, float startFramerate, float targetFramerate,
+                                                             const QByteArray &encoding, int expectedCount)
+{
+    const auto rejected = [](const QString &reason) { return ImportResult{false, 0, reason}; };
+    if (isLocked()) return rejected(QStringLiteral("Subtitles are locked."));
+    const double fps = pCore->getCurrentFps();
+    const double multiplier = targetFramerate / startFramerate;
+    if (!std::isfinite(fps) || fps <= 0 || !std::isfinite(startFramerate) || startFramerate <= 0 || !std::isfinite(targetFramerate) || targetFramerate <= 0 ||
+        !std::isfinite(multiplier) || multiplier <= 0 || expectedCount < -1)
+        return rejected(QStringLiteral("Invalid subtitle frame rate or expected event count."));
+    QFile file(filePath);
+    constexpr qint64 maximumBytes = 16 * 1024 * 1024;
+    if (!file.open(QIODevice::ReadOnly)) return rejected(file.errorString());
+    const QByteArray bytes = file.read(maximumBytes + 1);
+    if (file.error() != QFileDevice::NoError || !file.atEnd() || bytes.size() > maximumBytes)
+        return rejected(QStringLiteral("ASS import exceeds the 16 MiB input limit or cannot be read."));
+    auto codec = QStringConverter::encodingForName(encoding.constData());
+    if (!codec) return rejected(QStringLiteral("The subtitle codec is not recognized by this Qt build."));
+    if (bytes.startsWith(QByteArray::fromHex("efbbbf")) || bytes.startsWith(QByteArray::fromHex("fffe")) || bytes.startsWith(QByteArray::fromHex("feff")) ||
+        bytes.startsWith(QByteArray::fromHex("0000feff")))
+        codec = QStringConverter::encodingForData(bytes);
+    if (!codec) return rejected(QStringLiteral("Invalid ASS Unicode BOM."));
+    QStringDecoder decoder(*codec, QStringConverter::Flag::Stateless);
+    const QString contents = decoder.decode(bytes);
+    if (decoder.hasError() || contents.contains(QChar::Null)) return rejected(QStringLiteral("ASS text decoding failed."));
+
+    const auto before = std::make_shared<const ImportMetadata>(captureImportMetadata());
+    ImportMetadata parsed = *before;
+    struct ImportedEvent
+    {
+        int id;
+        std::pair<int, GenTime> start;
+        SubtitleEvent event;
+    };
+    std::vector<ImportedEvent> events;
+    std::set<std::pair<int, int>> starts;
+    QString section;
+    bool turn = false;
+    const auto growLayers = [&parsed](int layer) {
+        parsed.maxLayer = qMax(parsed.maxLayer, layer);
+        while (parsed.defaultStyles.size() <= parsed.maxLayer)
+            parsed.defaultStyles.append(QStringLiteral("Default"));
+    };
+    const QString styleFormat = QStringLiteral("name,fontname,fontsize,primarycolour,secondarycolour,outlinecolour,backcolour,bold,italic,underline,"
+                                               "strikeout,scalex,scaley,spacing,angle,borderstyle,outline,shadow,alignment,marginl,marginr,marginv,encoding");
+    const QString eventFormat = QStringLiteral("layer,start,end,style,name,marginl,marginr,marginv,effect,text");
+    for (const auto &raw : contents.split(QLatin1Char('\n'))) {
+        if (raw.size() > 65536) return rejected(QStringLiteral("ASS records exceed the 65536 character limit."));
+        const QString line = raw.simplified();
+        if (line.isEmpty()) {
+            turn = false;
+            continue;
+        }
+        QString compact = line;
+        compact.remove(QLatin1Char(' '));
+        const bool sectionHeader =
+            line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']')) &&
+            (compact.contains(QStringLiteral("ScriptInfo")) || compact.contains(QStringLiteral("KdenliveExtradata")) ||
+             line.contains(QStringLiteral("Styles")) || line.contains(QStringLiteral("Fonts")) || line.contains(QStringLiteral("Events")));
+        // The existing native section state changes only after a blank line.
+        // Reject missing separators instead of swallowing a header (especially
+        // Events inside Fonts) and committing a misleading metadata-only import.
+        if (turn && sectionHeader) return rejected(QStringLiteral("ASS sections must be separated by a blank line."));
+        if (!turn) {
+            if (compact.contains(QStringLiteral("ScriptInfo")))
+                section = QStringLiteral("script");
+            else if (compact.contains(QStringLiteral("KdenliveExtradata")))
+                section = QStringLiteral("extra");
+            else if (line.contains(QStringLiteral("Styles")))
+                section = QStringLiteral("styles");
+            else if (line.contains(QStringLiteral("Fonts")))
+                section = QStringLiteral("fonts");
+            else if (line.contains(QStringLiteral("Events")))
+                section = QStringLiteral("events");
+            else
+                section.clear();
+            if (!section.isEmpty()) {
+                turn = true;
+                continue;
+            }
+        }
+        if (section == QLatin1String("script")) {
+            if (line.contains(QLatin1Char(':'))) parsed.script[line.section(QLatin1Char(':'), 0, 0).trimmed()] = line.section(QLatin1Char(':'), 1).trimmed();
+        } else if (section == QLatin1String("extra")) {
+            const auto fields = line.split(QLatin1Char(':'));
+            if (fields.size() != 2) return rejected(QStringLiteral("Malformed ASS extra-data record."));
+            if (fields.first().trimmed() == QLatin1String("MaxLayer")) {
+                bool valid = false;
+                const int layer = fields.last().trimmed().toInt(&valid);
+                if (!valid || layer < 0 || layer > 50) return rejected(QStringLiteral("Invalid ASS maximum layer."));
+                growLayers(layer);
+            } else if (fields.first().trimmed() == QLatin1String("DefaultStyles")) {
+                parsed.defaultStyles = fields.last().trimmed().split(QLatin1Char(','));
+                if (parsed.defaultStyles.size() > 51) return rejected(QStringLiteral("Invalid ASS default-style count."));
+                growLayers(parsed.maxLayer);
+            }
+        } else if (section == QLatin1String("styles")) {
+            if (line.startsWith(QStringLiteral("Format:"))) {
+                QString columns = line.section(QLatin1Char(':'), 1).toLower();
+                columns.remove(QLatin1Char(' '));
+                if (columns != styleFormat) return rejected(QStringLiteral("Unsupported ASS style column order."));
+            } else {
+                if (!validImportedAssStyle(line)) return rejected(QStringLiteral("Malformed ASS style record."));
+                const QString name = line.section(QLatin1Char(':'), 1).trimmed().section(QLatin1Char(','), 0, 0);
+                parsed.styles[name] = SubtitleStyle(line);
+            }
+        } else if (section == QLatin1String("fonts")) {
+            parsed.fonts += line + QLatin1Char('\n');
+            if (parsed.fonts.size() > maximumBytes) return rejected(QStringLiteral("ASS embedded font data exceeds the input limit."));
+        } else if (section == QLatin1String("events")) {
+            if (line.startsWith(QStringLiteral("Format:"))) {
+                QString columns = line.section(QLatin1Char(':'), 1).toLower();
+                columns.remove(QLatin1Char(' '));
+                if (columns != eventFormat && columns != QString(eventFormat).replace(QStringLiteral(",name,"), QStringLiteral(",actor,")))
+                    return rejected(QStringLiteral("Unsupported ASS event column order."));
+                turn = true;
+                continue;
+            }
+            if ((!line.startsWith(QStringLiteral("Dialogue:")) && !line.startsWith(QStringLiteral("Comment:"))) || line.contains(QStringLiteral("Format:")))
+                return rejected(QStringLiteral("Malformed ASS event record."));
+            const auto fields = line.section(QLatin1Char(':'), 1).split(QLatin1Char(','));
+            if (fields.size() < 10) return rejected(QStringLiteral("Incomplete ASS event record."));
+            bool valid = false;
+            const int layer = fields.first().trimmed().toInt(&valid);
+            GenTime first, last;
+            if (!valid || layer < 0 || layer > 50 || !importedAssTime(fields.at(1), fps, multiplier, first) ||
+                !importedAssTime(fields.at(2), fps, multiplier, last))
+                return rejected(QStringLiteral("Invalid ASS event layer or timestamp."));
+            for (int index = 5; index <= 7; ++index) {
+                fields.at(index).toInt(&valid);
+                if (!valid) return rejected(QStringLiteral("Invalid ASS event margin."));
+            }
+            const qint64 firstFrame = qint64(first.frames(fps)) + offset, lastFrame = qint64(last.frames(fps)) + offset;
+            if (firstFrame < 0 || lastFrame <= firstFrame || lastFrame >= std::numeric_limits<int>::max() ||
+                GenTime(int(lastFrame), fps).ms() >= std::numeric_limits<int>::max())
+                return rejected(QStringLiteral("Invalid ASS event range after frame conversion and offset."));
+            const std::pair<int, int> key(layer, int(firstFrame));
+            if (!starts.insert(key).second || getIdForStartPos(layer, GenTime(int(firstFrame), fps)) >= 0)
+                return rejected(QStringLiteral("ASS events collide with an existing start in the same layer."));
+            QString nativeLine = line;
+            nativeLine.replace(QStringLiteral("\\N"), QStringLiteral("\n"));
+            std::pair<int, GenTime> start;
+            SubtitleEvent event(nativeLine, fps, multiplier, &start);
+            if (event.endTime() == GenTime()) return rejected(QStringLiteral("The native ASS event constructor rejected a validated record."));
+            start.second += GenTime(offset, fps);
+            event.setEndTime(event.endTime() + GenTime(offset, fps));
+            event.setText(event.text().trimmed());
+            events.push_back({-1, start, event});
+            if (events.size() > 10000) return rejected(QStringLiteral("ASS imports exceed the 10000 event limit."));
+            growLayers(layer);
+        }
+        turn = true;
+    }
+    if (expectedCount >= 0 && int(events.size()) != expectedCount) return rejected(QStringLiteral("The ASS event count does not match the validated file."));
+    bool sameStyles = parsed.styles.size() == before->styles.size();
+    if (sameStyles) {
+        for (const auto &entry : parsed.styles) {
+            const auto old = before->styles.find(entry.first);
+            if (old == before->styles.end() || !sameImportedStyle(old->second, entry.second)) {
+                sameStyles = false;
+                break;
+            }
+        }
+    }
+    const bool sameMetadata = sameStyles && parsed.script == before->script && parsed.fonts == before->fonts && parsed.defaultStyles == before->defaultStyles &&
+                              parsed.maxLayer == before->maxLayer && parsed.activeLayer == before->activeLayer;
+    if (events.empty() && sameMetadata) return rejected(QStringLiteral("The ASS file contains no new events or metadata changes."));
+    // Only fully validated files allocate IDs. These are reused by every redo.
+    for (auto &entry : events)
+        entry.id = TimelineModel::getNextId();
+    const auto imported = std::make_shared<const std::vector<ImportedEvent>>(std::move(events));
+    const auto after = std::make_shared<const ImportMetadata>(std::move(parsed));
+    const int language =
+        pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
+    const auto context = [this, language] {
+        return !isLocked() && pCore->currentDoc() &&
+               pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt() ==
+                   language;
+    };
+    const auto notify = [this] {
+        Q_EMIT m_timeline->maxSubLayerChanged();
+        Q_EMIT activeSubLayerChanged();
+        Q_EMIT modelChanged();
+        pCore->refreshProjectMonitorOnce();
+    };
+    Fun redo = [this, imported, before, after, context, notify] {
+        QWriteLocker locker(&m_lock);
+        if (!context()) return false;
+        for (const auto &entry : *imported)
+            if (hasSubtitle(entry.id) || m_subtitleList.count(entry.start) > 0) return false;
+        restoreImportMetadata(*after);
+        size_t added = 0;
+        for (const auto &entry : *imported) {
+            if (!addSubtitle(entry.id, entry.start, entry.event, false, false)) {
+                bool restored = true;
+                while (added > 0)
+                    restored = removeSubtitle(imported->at(--added).id, false, false) && restored;
+                restoreImportMetadata(*before);
+                notify();
+                Q_ASSERT(restored);
+                return false;
+            }
+            ++added;
+        }
+        notify();
+        return true;
+    };
+    Fun undo = [this, imported, before, after, context, notify] {
+        QWriteLocker locker(&m_lock);
+        if (!context()) return false;
+        for (const auto &entry : *imported)
+            if (!hasSubtitle(entry.id) || m_allSubtitles.at(entry.id) != entry.start || m_timeline->m_groups->isInGroup(entry.id)) return false;
+        size_t removed = 0;
+        for (auto entry = imported->rbegin(); entry != imported->rend(); ++entry) {
+            if (!removeSubtitle(entry->id, false, false)) {
+                bool restored = true;
+                for (size_t index = imported->size() - removed; index < imported->size(); ++index) {
+                    const auto &old = imported->at(index);
+                    restored = addSubtitle(old.id, old.start, old.event, false, false) && restored;
+                }
+                restoreImportMetadata(*after);
+                notify();
+                Q_ASSERT(restored);
+                return false;
+            }
+            ++removed;
+        }
+        restoreImportMetadata(*before);
+        notify();
+        return true;
+    };
+    if (!redo()) return rejected(QStringLiteral("The native ASS transaction failed before committing to history."));
+    pCore->pushUndo(undo, redo, i18n("Edit subtitle"));
+    return {true, int(imported->size()), {}};
+}
+
+void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool externalImport, float startFramerate, float targetFramerate,
+                                   const QByteArray &encoding)
+{
+    const auto result = importSubtitleWithUndo(filePath, offset, externalImport, startFramerate, targetFramerate, encoding);
+    if (externalImport && !result.success) {
+        pCore->displayMessage(i18n("The selected subtitle file %1 is invalid: %2", filePath, result.error), ErrorMessage);
+    }
+}
+
+SubtitleModel::ImportResult SubtitleModel::importSubtitleWithUndo(const QString &filePath, int offset, bool externalImport, float startFramerate,
+                                                                  float targetFramerate, const QByteArray &encoding, int expectedCount)
+{
+    if (externalImport && filePath.endsWith(QLatin1String(".ass"), Qt::CaseInsensitive)) {
+        return importAssSubtitle(filePath, offset, startFramerate, targetFramerate, encoding, expectedCount);
+    }
     QString start, end, comment;
     QString timeLine;
     GenTime startPos, endPos;
     int turn = 0, r = 0, endIndex = 1, defaultTurn = 0;
-    double transformMult = targetFramerate/startFramerate;
+    double transformMult = targetFramerate / startFramerate;
     /*
      * turn = 0 -> Parse next subtitle line [srt] (or) [vtt] (or) [sbv] (or) Parse next section [ssa]
      * turn = 1 -> Add string to timeLine
      * turn > 1 -> Add string to completeLine
      */
-    if (filePath.isEmpty() || isLocked()) return;
+    // Loading a language is an internal state exchange, not a user edit. Keep
+    // the real lock observable throughout, while allowing only this scoped load.
+    if (filePath.isEmpty() || (isLocked() && !m_languageStateChanging)) return {false, 0, QStringLiteral("Subtitle path is empty or the model is locked.")};
     Fun redo = []() { return true; };
     Fun undo = [this]() {
         Q_EMIT modelChanged();
@@ -236,11 +557,11 @@ void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool ext
         QFile srtFile(filePath);
         if (!srtFile.exists() || !srtFile.open(QIODevice::ReadOnly)) {
             qDebug() << " File not found " << filePath;
-            return;
+            return {false, 0, QStringLiteral("Cannot read the subtitle file.")};
         }
 
         qDebug() << "srt/vtt/sbv File";
-        //parsing srt file
+        // parsing srt file
         QTextStream stream(&srtFile);
         std::optional<QStringConverter::Encoding> inputEncoding = QStringConverter::encodingForName(encoding.data());
         if (inputEncoding) {
@@ -308,7 +629,7 @@ void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool ext
         QFile assFile(filePath);
         if (!assFile.exists() || !assFile.open(QIODevice::ReadOnly)) {
             qDebug() << " Failed attempt on opening " << filePath;
-            return;
+            return {false, 0, QStringLiteral("Cannot read the subtitle file.")};
         }
         QTextStream stream(&assFile);
         std::optional<QStringConverter::Encoding> inputEncoding = QStringConverter::encodingForName(encoding.data());
@@ -418,8 +739,16 @@ void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool ext
     }
     if (initialCount == m_subtitleList.size() && externalImport) {
         // Nothing imported
-        pCore->displayMessage(i18n("The selected file %1 is invalid.", filePath), ErrorMessage);
-        return;
+        return {false, 0, QStringLiteral("No subtitle events were imported.")};
+    }
+    const int importedCount = int(m_subtitleList.size() - initialCount);
+    if (externalImport && expectedCount >= 0 && importedCount != expectedCount) {
+        // No command has been pushed: the prior redo branch remains owned by
+        // the stack. These legacy text formats have no file-level metadata.
+        const bool restored = undo() && m_subtitleList.size() == initialCount;
+        return {false, 0,
+                restored ? QStringLiteral("Native subtitle event count did not match the validated file.")
+                         : QStringLiteral("Native subtitle rollback failed.")};
     }
     Fun update_model = [this]() {
         Q_EMIT modelChanged();
@@ -430,6 +759,7 @@ void SubtitleModel::importSubtitle(const QString &filePath, int offset, bool ext
     if (externalImport) {
         pCore->pushUndo(undo, redo, i18n("Edit subtitle"));
     }
+    return {true, importedCount, {}};
 }
 
 void SubtitleModel::parseSubtitle(const QString &workPath)
@@ -450,7 +780,7 @@ const QString SubtitleModel::getUrl()
 
 bool SubtitleModel::addSubtitle(std::pair<int, GenTime> start, const SubtitleEvent &event, Fun &undo, Fun &redo, bool updateFilter)
 {
-    if (isLocked()) {
+    if (isLocked() && !m_languageStateChanging) {
         return false;
     }
     int id = TimelineModel::getNextId();
@@ -475,7 +805,7 @@ bool SubtitleModel::addSubtitle(std::pair<int, GenTime> start, const SubtitleEve
 
 bool SubtitleModel::addSubtitle(int id, std::pair<int, GenTime> start, const SubtitleEvent &event, bool temporary, bool updateFilter)
 {
-    if (start.second.frames(pCore->getCurrentFps()) < 0 || event.endTime().frames(pCore->getCurrentFps()) < 0 || isLocked()) {
+    if (start.second.frames(pCore->getCurrentFps()) < 0 || event.endTime().frames(pCore->getCurrentFps()) < 0 || (isLocked() && !m_languageStateChanging)) {
         qDebug() << "Time error: is negative";
         return false;
     }
@@ -770,13 +1100,16 @@ int SubtitleModel::cutSubtitle(int layer, int position, Fun &undo, Fun &redo, bo
 
 void SubtitleModel::registerSnap(const std::weak_ptr<SnapInterface> &snapModel)
 {
-    // make sure ptr is valid
     if (auto ptr = snapModel.lock()) {
-        // ptr is valid, we store it
+        // Each observer owns one reference per subtitle endpoint. Registering
+        // the same model twice would leave doubled native snap refcounts.
+        for (const auto &registered : m_regSnaps) {
+            if (registered.lock() == ptr) return;
+        }
         m_regSnaps.push_back(snapModel);
-        // we now add the already existing subtitles to the snap
         for (const auto &subtitle : m_subtitleList) {
             ptr->addPoint(subtitle.first.second.frames(pCore->getCurrentFps()));
+            ptr->addPoint(subtitle.second.endTime().frames(pCore->getCurrentFps()));
         }
     } else {
         qDebug() << "Error: added snapmodel for subtitle is null";
@@ -1003,6 +1336,35 @@ bool SubtitleModel::editSubtitle(int id, const QString &newSubtitleText)
     return true;
 }
 
+bool SubtitleModel::updateSubtitleEvent(int id, std::pair<int, GenTime> start, const SubtitleEvent &event)
+{
+    if (isLocked() || !hasSubtitle(id) || start.first < 0 || start.first > m_maxLayer || start.second < GenTime() || event.endTime() <= start.second)
+        return false;
+    const auto oldStart = m_allSubtitles.at(id);
+    const auto existing = m_subtitleList.find(start);
+    if (start != oldStart && existing != m_subtitleList.end()) return false;
+    const auto previous = m_subtitleList.at(oldStart);
+    removeSnapPoint(oldStart.second);
+    removeSnapPoint(previous.endTime());
+    if (start == oldStart)
+        m_subtitleList.at(start) = event;
+    else {
+        m_subtitleList.erase(oldStart);
+        m_subtitleList.emplace(start, event);
+        m_allSubtitles.at(id) = start;
+    }
+    addSnapPoint(start.second);
+    addSnapPoint(event.endTime());
+    const int row = getSubtitleIndex(id);
+    Q_EMIT dataChanged(index(row), index(row), {});
+    Q_EMIT modelChanged();
+    m_timeline->updateDuration();
+    const QPair<int, int> range{qMin(oldStart.second.frames(pCore->getCurrentFps()), start.second.frames(pCore->getCurrentFps())),
+                                qMax(previous.endTime().frames(pCore->getCurrentFps()), event.endTime().frames(pCore->getCurrentFps()))};
+    pCore->invalidateRange(range);
+    pCore->refreshProjectRange(range);
+    return true;
+}
 bool SubtitleModel::removeSubtitle(int id, bool temporary, bool updateFilter)
 {
     qDebug() << "Deleting subtitle in model";
@@ -1254,6 +1616,9 @@ void SubtitleModel::restoreTmpFile(int ix)
 
 void SubtitleModel::jsontoSubtitle(const QJsonArray &data)
 {
+    // A language exchange temporarily contains empty/intermediate maps. Only the
+    // committed language may update its native work file and filter.
+    if (m_languageStateChanging) return;
     int ix = pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
     QString outFile = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, false);
     QString masterFile = m_subtitleFilter->get("av.filename");
@@ -1312,7 +1677,7 @@ int SubtitleModel::saveSubtitleData(const QJsonArray &list, const QString &outFi
             }
             out << '\n';
 
-            if (!fontSection.isEmpty()) out << fontSection << '\n';
+            if (!fontSection.isEmpty()) out << "[Fonts]\n" << fontSection << '\n';
 
             out << QStringLiteral("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
         }
@@ -1750,28 +2115,28 @@ void SubtitleModel::setSubtitlesList(QMap<std::pair<int, QString>, QString> list
 
 void SubtitleModel::updateModelName(int ix, const QString &name)
 {
-    QMapIterator<std::pair<int, QString>, QString> i(m_subtitlesList);
-    std::pair<int, QString> oldSub = {-1, QString()};
-    QString path;
-    while (i.hasNext()) {
-        i.next();
+    auto found = m_subtitlesList.end();
+    for (auto i = m_subtitlesList.begin(); i != m_subtitlesList.end(); ++i)
         if (i.key().first == ix) {
-            // match
-            oldSub = i.key();
-            path = i.value();
+            found = i;
             break;
         }
-    }
-    if (oldSub.first > -1) {
-        int ix = oldSub.first;
-        m_subtitlesList.remove(oldSub);
-        m_subtitlesList.insert({ix, name}, path);
-    } else {
-        qDebug() << "COULD NOT FIND SUBTITLE TO EDIT, CNT:" << m_subtitlesList.size();
-    }
-    Q_EMIT m_timeline->subtitlesListChanged();
+    if (found == m_subtitlesList.end() || name.isEmpty() || found.key().second == name) return;
+    const auto before = found.key();
+    const auto after = std::pair<int, QString>{ix, name};
+    const QString path = found.value();
+    const auto rename = [this, path](const std::pair<int, QString> &from, const std::pair<int, QString> &to) {
+        if (!m_subtitlesList.contains(from)) return false;
+        m_subtitlesList.remove(from);
+        m_subtitlesList.insert(to, path);
+        Q_EMIT m_timeline->subtitlesListChanged();
+        Q_EMIT activeSubtitleChanged();
+        return true;
+    };
+    Fun undo = [rename, before, after] { return rename(after, before); };
+    Fun redo = [rename, before, after] { return rename(before, after); };
+    if (redo()) pCore->pushUndo(undo, redo, i18n("Rename Subtitle Language"));
 }
-
 int SubtitleModel::getMaxLayer() const
 {
     return m_maxLayer;
@@ -1779,34 +2144,35 @@ int SubtitleModel::getMaxLayer() const
 
 void SubtitleModel::requestDeleteLayer(int layer)
 {
+    if (isLocked() || layer < 0 || layer > m_maxLayer || m_maxLayer == 0) return;
     std::map<std::pair<int, GenTime>, SubtitleEvent> oldSubtitles;
-    for (auto it = m_subtitleList.begin(); it != m_subtitleList.end(); ++it) {
-        if (it->first.first == layer) {
-            oldSubtitles[it->first] = it->second;
-        }
-    }
-
     std::map<std::pair<int, GenTime>, int> oldIds;
-    for (const auto &sub : oldSubtitles) {
-        oldIds[sub.first] = getIdForStartPos(sub.first.first, sub.first.second);
-    }
-
-    Fun redo = [this, layer]() {
+    for (const auto &event : m_subtitleList)
+        if (event.first.first == layer) {
+            oldSubtitles.insert(event);
+            oldIds[event.first] = getIdForStartPos(layer, event.first.second);
+        }
+    m_timeline->requestClearSelection(true);
+    Fun groupUndo = [] { return true; }, groupRedo = [] { return true; };
+    for (const auto &entry : oldIds)
+        if (!m_timeline->extractItemFromGroup(entry.second, groupUndo, groupRedo, true)) {
+            groupUndo();
+            return;
+        }
+    Fun redo = [this, layer, groupRedo]() {
+        if (!groupRedo()) return false;
         deleteLayer(layer);
         return true;
     };
-
-    Fun undo = [this, layer, oldSubtitles, oldIds]() {
+    Fun undo = [this, layer, oldSubtitles, oldIds, groupUndo]() {
         createLayer(layer);
-        // Re-add all subtitles
-        for (const auto &sub : oldSubtitles) {
-            addSubtitle(oldIds.at(sub.first), sub.first, sub.second);
-        }
+        for (const auto &sub : oldSubtitles)
+            if (!addSubtitle(oldIds.at(sub.first), sub.first, sub.second)) return false;
+        if (!groupUndo()) return false;
         Q_EMIT modelChanged();
         return true;
     };
-
-    redo();
+    deleteLayer(layer);
     pCore->pushUndo(undo, redo, i18n("Delete subtitle layer"));
 }
 void SubtitleModel::requestCreateLayer(int copiedLayer, int position)
@@ -1877,7 +2243,7 @@ void SubtitleModel::createLayer(int position)
 void SubtitleModel::reload()
 {
     int currentIx = pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
-    activateSubtitle(currentIx);
+    activateSubtitle(currentIx, true);
 }
 
 const std::map<QString, SubtitleStyle> &SubtitleModel::getAllSubtitleStyles(bool global) const
@@ -1926,67 +2292,120 @@ void SubtitleModel::deleteSubtitleStyle(const QString &name, bool global)
 
 int SubtitleModel::createNewSubtitle(const QString subtitleName, int id)
 {
-    // Create new subtitle file
-    QList<std::pair<int, QString>> keys = m_subtitlesList.keys();
+    const auto keys = m_subtitlesList.keys();
     QStringList existingNames;
-    int maxIx = 0;
-    for (auto &l : keys) {
-        existingNames << l.second;
-        if (l.first > maxIx) {
-            maxIx = l.first;
-        }
+    int maxId = 0;
+    for (const auto &key : keys) {
+        existingNames << key.second;
+        maxId = qMax(maxId, key.first);
     }
-    maxIx++;
-    int ix = m_subtitlesList.size() + 1;
-    QString newName = subtitleName;
-    if (newName.isEmpty()) {
-        newName = i18nc("@item:inlistbox subtitle track name", "Subtitle %1", ix);
-        while (existingNames.contains(newName)) {
-            ix++;
-            newName = i18nc("@item:inlistbox subtitle track name", "Subtitle %1", ix);
-        }
+    ++maxId;
+    QString name = subtitleName;
+    int suffix = m_subtitlesList.size() + 1;
+    if (name.isEmpty()) {
+        do {
+            name = i18nc("@item:inlistbox subtitle track name", "Subtitle %1", suffix++);
+        } while (existingNames.contains(name));
     }
-    const QString newPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), maxIx, true);
-    m_subtitlesList.insert({maxIx, newName}, newPath);
+    QByteArray initial;
     if (id >= 0) {
-        // Duplicate existing subtitle
         QString source = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), id, false);
-        if (!QFile::exists(source)) {
-            source = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), id, true);
-        }
-        QFile::copy(source, newPath);
+        if (!QFile::exists(source)) source = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), id, true);
+        QFile file(source);
+        if (!file.open(QIODevice::ReadOnly)) return -1;
+        initial = file.readAll();
     }
-    Q_EMIT m_timeline->subtitlesListChanged();
+    const auto entry = std::pair<int, QString>{maxId, name};
+    const auto create = [this, entry, initial] {
+        const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, false);
+        const QString finalPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, true);
+        if (m_subtitlesList.contains(entry) || QFile::exists(workPath)) return false;
+        QFile file(workPath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return false;
+        if (file.write(initial) != initial.size() || !file.flush()) {
+            file.close();
+            QFile::remove(workPath);
+            return false;
+        }
+        file.close();
+        m_subtitlesList.insert(entry, finalPath);
+        Q_EMIT m_timeline->subtitlesListChanged();
+        return true;
+    };
+    Fun undo = [this, entry] {
+        const int active =
+            pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
+        if (active == entry.first) return false;
+        const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, false);
+        // Published ASS assets belong to saved project snapshots. Undo only edits
+        // the live work file, so Save / Undo / Discard cannot damage saved media.
+        if (QFile::exists(workPath) && !QFile::remove(workPath)) return false;
+        m_subtitlesList.remove(entry);
+        Q_EMIT m_timeline->subtitlesListChanged();
+        return true;
+    };
+    Fun redo = create;
+    if (!redo()) return -1;
+    pCore->pushUndo(undo, redo, i18n("Create Subtitle Language"));
     return m_subtitlesList.size();
 }
 
 bool SubtitleModel::deleteSubtitle(int ix)
 {
-    QMapIterator<std::pair<int, QString>, QString> i(m_subtitlesList);
-    bool success = false;
-    std::pair<int, QString> matchingItem = {-1, QString()};
-    while (i.hasNext()) {
-        i.next();
+    if (m_subtitlesList.size() < 2) return false;
+    auto found = m_subtitlesList.end();
+    for (auto i = m_subtitlesList.begin(); i != m_subtitlesList.end(); ++i)
         if (i.key().first == ix) {
-            // Found a match
-            matchingItem = i.key();
-            success = true;
+            found = i;
             break;
         }
+    if (found == m_subtitlesList.end()) return false;
+    const auto entry = found.key();
+    QString source = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, false);
+    if (!QFile::exists(source)) source = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, true);
+    QFile sourceFile(source);
+    if (!sourceFile.open(QIODevice::ReadOnly)) return false;
+    const QByteArray initial = sourceFile.readAll();
+    sourceFile.close();
+    const int active =
+        pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
+    // The interactive manager can delete its selected language; first leave it through
+    // the ordinary undoable activation path so no live event IDs outlast their language.
+    if (active == ix) {
+        int replacement = -1;
+        for (const auto &key : m_subtitlesList.keys())
+            if (key.first != ix) {
+                replacement = key.first;
+                break;
+            }
+        if (replacement < 0 || !activateSubtitle(replacement)) return false;
     }
-    if (success && matchingItem.first > -1) {
-        // Delete subtitle files
-        const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), matchingItem.first, false);
-        const QString finalPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), matchingItem.first, true);
-        QFile::remove(workPath);
-        QFile::remove(finalPath);
-        // Remove entry from our subtitles list
-        m_subtitlesList.remove(matchingItem);
-    }
-    Q_EMIT m_timeline->subtitlesListChanged();
-    return success;
+    Fun redo = [this, entry] {
+        const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, false);
+        if (QFile::exists(workPath) && !QFile::remove(workPath)) return false;
+        m_subtitlesList.remove(entry);
+        Q_EMIT m_timeline->subtitlesListChanged();
+        return true;
+    };
+    Fun undo = [this, entry, initial] {
+        const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, false);
+        const QString finalPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), entry.first, true);
+        QFile file(workPath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return false;
+        if (file.write(initial) != initial.size() || !file.flush()) {
+            file.close();
+            QFile::remove(workPath);
+            return false;
+        }
+        file.close();
+        m_subtitlesList.insert(entry, finalPath);
+        Q_EMIT m_timeline->subtitlesListChanged();
+        return true;
+    };
+    if (!redo()) return false;
+    pCore->pushUndo(undo, redo, i18n("Delete Subtitle Language"));
+    return true;
 }
-
 const QString SubtitleModel::subtitlesFilesToJson()
 {
     QJsonArray list;
@@ -2016,41 +2435,144 @@ const QString SubtitleModel::globalStylesToJson()
     return QString::fromUtf8(json.toJson());
 }
 
-void SubtitleModel::activateSubtitle(int ix)
+bool SubtitleModel::swapLanguageState(LanguageState &state)
 {
-    // int currentIx = pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"),
-    // QStringLiteral("0")).toInt(); if (currentIx == ix) {
-    //     return;
-    // }
-    const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, false);
-    const QString finalPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, true);
-    if (!QFile::exists(workPath) && QFile::exists(finalPath)) {
-        QFile::copy(finalPath, workPath);
+    // Selection is transient, while group identity is restored by the activation command.
+    m_timeline->requestClearSelection(true);
+    for (const auto &entry : m_allSubtitles) {
+        if (m_timeline->m_groups->isInGroup(entry.first)) return false;
     }
-    QFile file(workPath);
-    if (!file.exists()) {
-        // Create work file
-        if (!file.open(QIODevice::WriteOnly)) {
-            qWarning() << "Failed to create subtitle work file:" << workPath << file.errorString();
-            return;
-        }
-        file.close();
+    if (!m_languageStateChanging) beginResetModel();
+    for (const auto &entry : m_allSubtitles) {
+        const auto &event = m_subtitleList.at(entry.second);
+        removeSnapPoint(entry.second.second);
+        removeSnapPoint(event.endTime());
+        m_timeline->m_groups->destructGroupItem(entry.first);
     }
-
-    beginRemoveRows(QModelIndex(), 0, m_allSubtitles.size());
-    m_subtitleList.clear();
-    m_subtitleStyles.clear();
-    m_scriptInfo.clear();
-    m_maxLayer = 0;
-    m_defaultStyles.clear();
-    while (!m_allSubtitles.empty()) {
-        deregisterSubtitle(m_allSubtitles.begin()->first);
+    m_subtitleList.swap(state.events);
+    m_allSubtitles.swap(state.ids);
+    m_subtitleStyles.swap(state.styles);
+    m_scriptInfo.swap(state.script);
+    m_subtitlesFakePos.swap(state.fakePositions);
+    m_defaultStyles.swap(state.defaultStyles);
+    fontSection.swap(state.fonts);
+    QString file = m_subtitleFilter->get("av.filename");
+    m_subtitleFilter->set("av.filename", state.file.toUtf8().constData());
+    state.file = file;
+    std::swap(m_maxLayer, state.maxLayer);
+    std::swap(m_activeSubLayer, state.activeLayer);
+    m_selected.clear();
+    m_grabbedIds.clear();
+    for (const auto &entry : m_allSubtitles) {
+        const auto &event = m_subtitleList.at(entry.second);
+        m_timeline->m_groups->createGroupItem(entry.first);
+        addSnapPoint(entry.second.second);
+        addSnapPoint(event.endTime());
     }
-    endRemoveRows();
-    pCore->currentDoc()->setSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), ix);
-    parseSubtitle(workPath);
+    if (!m_languageStateChanging) endResetModel();
+    return true;
 }
 
+bool SubtitleModel::exchangeLanguageState(int id, const Fun &exchange)
+{
+    beginResetModel();
+    bool success = false;
+    {
+        QScopedValueRollback<bool> changing(m_languageStateChanging, true);
+        {
+            QSignalBlocker signals(this);
+            success = exchange();
+            if (success) {
+                pCore->currentDoc()->setSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), id);
+                restoreTmpFile(id);
+            }
+        }
+        // Observers receive only the committed map/index/filter combination. The
+        // reset-to-modelChanged adapter suppresses intermediate file persistence.
+        endResetModel();
+    }
+    if (success) languageStateActivated(id);
+    return success;
+}
+
+void SubtitleModel::languageStateActivated(int id)
+{
+    pCore->currentDoc()->setSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), id);
+    m_timeline->updateDuration();
+    Q_EMIT m_timeline->maxSubLayerChanged();
+    Q_EMIT activeSubLayerChanged();
+    Q_EMIT activeSubtitleChanged();
+    Q_EMIT modelChanged();
+    pCore->refreshProjectMonitorOnce();
+}
+
+bool SubtitleModel::activateSubtitle(int ix, bool forceReload)
+{
+    const int currentIx =
+        pCore->currentDoc()->getSequenceProperty(m_timeline->uuid(), QStringLiteral("kdenlive:activeSubtitleIndex"), QStringLiteral("0")).toInt();
+    if (currentIx == ix && !forceReload) return true;
+    const bool exists = std::any_of(m_subtitlesList.keyBegin(), m_subtitlesList.keyEnd(), [ix](const auto &entry) { return entry.first == ix; });
+    if (!exists) return false;
+    const QString workPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, false);
+    const QString finalPath = pCore->currentDoc()->subTitlePath(m_timeline->uuid(), ix, true);
+    if (!QFile::exists(workPath) && QFile::exists(finalPath) && !QFile::copy(finalPath, workPath)) return false;
+    if (!QFile::exists(workPath)) {
+        QFile file(workPath);
+        if (!file.open(QIODevice::WriteOnly)) return false;
+    }
+    m_timeline->requestClearSelection(true);
+    Fun groupUndo = [] { return true; }, groupRedo = [] { return true; };
+    for (const auto &entry : m_allSubtitles) {
+        if (!m_timeline->extractItemFromGroup(entry.first, groupUndo, groupRedo, true)) {
+            groupUndo();
+            return false;
+        }
+    }
+    auto previous = std::make_shared<LanguageState>();
+    auto next = std::make_shared<LanguageState>();
+    if (!exchangeLanguageState(ix, [this, previous, workPath] {
+            if (!swapLanguageState(*previous)) return false;
+            parseSubtitle(workPath);
+            return true;
+        })) {
+        groupUndo();
+        return false;
+    }
+    // Undo crosses the language boundary before any commands referring to the former IDs.
+    // Map swaps retain the exact event nodes and IDs instead of reparsing saved files.
+    Fun undo = [this, previous, next, groupUndo, currentIx] {
+        return exchangeLanguageState(currentIx, [this, previous, next, groupUndo] {
+            if (!swapLanguageState(*next)) return false;
+            if (!swapLanguageState(*previous)) {
+                swapLanguageState(*next);
+                return false;
+            }
+            if (!groupUndo()) {
+                swapLanguageState(*previous);
+                swapLanguageState(*next);
+                return false;
+            }
+            return true;
+        });
+    };
+    Fun redo = [this, previous, next, groupRedo, groupUndo, ix] {
+        return exchangeLanguageState(ix, [this, previous, next, groupRedo, groupUndo] {
+            if (!groupRedo()) return false;
+            if (!swapLanguageState(*previous)) {
+                groupUndo();
+                return false;
+            }
+            if (!swapLanguageState(*next)) {
+                swapLanguageState(*previous);
+                groupUndo();
+                return false;
+            }
+            return true;
+        });
+    };
+    pCore->pushUndo(undo, redo, forceReload ? i18n("Reload Subtitles") : i18n("Switch Subtitle Language"));
+    return true;
+}
 void SubtitleModel::setMaxLayer(int layer)
 {
     if (layer > 50) {
@@ -2229,16 +2751,18 @@ void SubtitleModel::setStyleName(const int id, const QString &style, bool refres
     if (oldStyle == style) {
         return;
     }
-    Fun redo = [sub, this, style, refreshModel, id]() {
-        sub->second.setStyleName(style);
+    Fun redo = [this, style, refreshModel, id]() {
+        if (!hasSubtitle(id)) return false;
+        m_subtitleList.at(m_allSubtitles.at(id)).setStyleName(style);
         int row = getSubtitleIndex(id);
         Q_EMIT dataChanged(index(row), index(row), {StyleNameRole});
         if (refreshModel) Q_EMIT modelChanged();
         pCore->refreshProjectMonitorOnce();
         return true;
     };
-    Fun undo = [sub, this, oldStyle, refreshModel, id]() {
-        sub->second.setStyleName(oldStyle);
+    Fun undo = [this, oldStyle, refreshModel, id]() {
+        if (!hasSubtitle(id)) return false;
+        m_subtitleList.at(m_allSubtitles.at(id)).setStyleName(oldStyle);
         int row = getSubtitleIndex(id);
         Q_EMIT dataChanged(index(row), index(row), {StyleNameRole});
         if (refreshModel) Q_EMIT modelChanged();

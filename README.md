@@ -37,6 +37,10 @@ Kdenlive is written in C++ and is using these technologies and frameworks:
 4. If the MLT library is new to you check out [MLT Introduction](dev-docs/mlt-intro.md)
 3. Join our Matrix channel `#kdenlive-dev:kde.org` for developer discussions and support
 
+### Experimental local MCP control
+
+This branch includes an opt-in native MCP endpoint and a standard-library Python connector. See the [MCP setup, tool contracts and verification notes](dev-docs/mcp.md) before connecting a client.
+
 ### Contributing Code
 
 Kdenlive's primary development happens on [KDE Invent](https://invent.kde.org/multimedia/kdenlive). While we maintain a GitHub mirror, all code contributions should be submitted through KDE's GitLab instance. For more information about KDE's development infrastructure, visit the [KDE GitLab documentation](https://community.kde.org/Infrastructure/GitLab).

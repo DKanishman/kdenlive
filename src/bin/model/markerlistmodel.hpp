@@ -173,7 +173,15 @@ public:
     /** @brief Load the marker categories from a stringList
      *  @return the list of deleted categories ids (if any)
      */
-    void loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> remapCategories = {});
+    /** Category changes preserve marker IDs/ranges and never change application defaults.
+     *  The overload accepting models composes one atomic project transaction without pushing history.
+     */
+    bool loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> remapCategories = {});
+    bool loadCategoriesWithUndo(const QStringList &categories, const QStringList &currentCategories, const QMap<int, int> &remapCategories, Fun &undo,
+                                Fun &redo, const QList<std::shared_ptr<MarkerListModel>> &models = {});
+    /** Remove/remap markers in all supplied models atomically; true also means an unchanged successful operation. */
+    static bool removeCategories(const QList<std::shared_ptr<MarkerListModel>> &models, const QList<int> &toRemove, const QMap<int, int> &remapCategories,
+                                 Fun &undo, Fun &redo);
     QList<int> loadCategories(const QStringList &categories, bool notify = true);
     QStringList guideCategoriesToStringList(const QString &categoriesData);
     /** @brief Returns the marker categories in the form of a stringList for saving */
@@ -196,6 +204,9 @@ public Q_SLOTS:
    @param pushUndo: if true, create an undo object
  */
     bool importFromJson(const QString &data, bool ignoreConflicts, bool pushUndo = true);
+    /** Queue a producer marker import and keep category transactions unavailable until it finishes. */
+    void scheduleImportFromJson(const QString &data);
+    bool hasPendingImport() const;
     bool importFromJson(const QString &data, bool ignoreConflicts, Fun &undo, Fun &redo);
     bool importFromTxt(const QString &fileName, Fun &undo, Fun &redo);
     bool importFromFile(const QString &fileData, bool ignoreConflicts);
@@ -227,6 +238,12 @@ protected:
     void setup();
 
 private:
+    using CategoryMarkers = std::map<int, CommentedTime>;
+    static bool categoryTransaction(const QList<std::shared_ptr<MarkerListModel>> &models, const QList<int> &toRemove, const QMap<int, int> &remapCategories,
+                                    const QStringList &categories, bool updateMetadata, Fun &undo, Fun &redo);
+    bool categoryMarkersMatch(const CategoryMarkers &expected, const CategoryMarkers &replacement) const;
+    void replaceCategoryMarkers(const CategoryMarkers &expected, const CategoryMarkers &replacement);
+    int m_pendingImports{0};
     std::weak_ptr<DocUndoStack> m_undoStack;
     /** @brief the Id of the clip this model corresponds to. */
     QString m_clipId;
