@@ -1,0 +1,693 @@
+{
+  "timestampUtc": "2026-11-04T15:46:21.362463+00:00",
+  "mode": "read-only inventory plus explicitly authorized narrow roto guard; no dependency installation/download/network/capture performed",
+  "scope": [
+    "R21",
+    "R23",
+    "R29",
+    "R38"
+  ],
+  "denominatorPolicy": "These21 feature contracts enumerate concrete inputs, result variants, contexts and proof in the assigned slice. They are not an editor-wide completeness percentage or a count of QAction names.",
+  "featureContracts": [
+    {
+      "requirement": "R21",
+      "feature": "scene_detection",
+      "inputs": [
+        "ready local Video/AV bin source",
+        "threshold",
+        "native marker category",
+        "minimum interval"
+      ],
+      "outputs": [
+        "cut timestamps",
+        "point markers",
+        "range markers",
+        "native source subclips"
+      ],
+      "nativeApis": [
+        "jobs/SceneSplitTask constructor/start/run",
+        "TaskManager::startTask/requestCancellation",
+        "ProjectClip::importJsonMarkers",
+        "ProjectItemModel::loadSubClips"
+      ],
+      "acceptance": [
+        "synthetic exact cut frames",
+        "point/range/subclip inclusive boundaries",
+        "cancel before publication",
+        "nonzero-exit failure",
+        "one undo transaction and save/reopen exact native results"
+      ],
+      "availability": "FFmpeg select/showinfo installed; native selected-subclip action currently discards subclip range and analyzes full source"
+    },
+    {
+      "requirement": "R21",
+      "feature": "video_stabilization",
+      "inputs": [
+        "ready local source or selected source range",
+        "native vidstab parameter schema",
+        "new output MLT/TRF paths"
+      ],
+      "outputs": [
+        "stabilized MLT project clip",
+        "TRF motion data",
+        "bin import/folder policy"
+      ],
+      "nativeApis": [
+        "jobs/StabilizeTask constructor",
+        "project/ClipStabilize native parameter model",
+        "Bin::addProjectClipInFolder"
+      ],
+      "acceptance": [
+        "shaky grid displacement before/after",
+        "correct source in/out and referenced TRF",
+        "cancel leaves no published partial output",
+        "native reload and output render"
+      ],
+      "availability": "Unavailable: installed MLT vidstab module/dependency absent, Craft MOD_VIDSTAB=OFF; FFmpeg deshake is a different pipeline"
+    },
+    {
+      "requirement": "R21",
+      "feature": "registered_custom_clip_jobs",
+      "inputs": [
+        "registered ClipJobManager job ID and settings token",
+        "local bin source/full or subclip",
+        "typed registered file/list/frame parameters"
+      ],
+      "outputs": [
+        "derived media imported/replaced/folder placement",
+        "or LUT file applied as avfilter.lut3d"
+      ],
+      "nativeApis": [
+        "ClipJobManager::getClipJobNames/getJobParameters/getJobFolder",
+        "CustomJobTask constructor/run"
+      ],
+      "acceptance": [
+        "enumerate valid installed job definitions rather than arbitrary executable API",
+        "exact argv/source range",
+        "real exitCode/output metadata",
+        "owned cancel",
+        "LUT/native clip result persistence"
+      ],
+      "availability": "Source shipped config has built-ins plus unconfigured custom placeholder; user-defined executable jobs need per-definition discovery"
+    },
+    {
+      "requirement": "R23",
+      "feature": "manual_roto_properties",
+      "inputs": [
+        "effect scope bin/clip/track/master where native effect supports it",
+        "constant or frame-keyed point triples",
+        "optional first tracking flag and unfinished/clear curves"
+      ],
+      "outputs": [
+        "editable native roto filter property",
+        "animated alpha/luma/RGB mask",
+        "native keyframe interpolation"
+      ],
+      "nativeApis": [
+        "AssetParameterModel setters",
+        "KeyframeModel::parseRotoProperty/getInterpolatedValue",
+        "RotoHelper::getPoints/getSpline",
+        "MLT plusgpl rotoscoping"
+      ],
+      "acceptance": [
+        "malformed request refusal without history/model changes",
+        "0/2/10 chronological key render",
+        "alpha sampling",
+        "undo/redo/save/reopen; mask_start/mask_apply composition"
+      ],
+      "availability": "Installed native rotoscoping; narrow MCP guard staged in current work with request-only limits -4..4,256 points,512 keys,65536 UTF8 bytes"
+    },
+    {
+      "requirement": "R23",
+      "feature": "manual_roto_monitor_editing",
+      "inputs": [
+        "current effect/key/frame",
+        "pixel or normalized control point/handle coordinates",
+        "point insertion/deletion and transform"
+      ],
+      "outputs": [
+        "native monitor spline edit",
+        "updated keyframe data and effect display"
+      ],
+      "nativeApis": [
+        "MonitorRotoScene.qml",
+        "RotoHelper::slotUpdateFromMonitorData",
+        "KeyframeMonitorHelper"
+      ],
+      "acceptance": [
+        "native overlay agrees with typed points and rendered alpha",
+        "selection/seek does not corrupt mask",
+        "cancel unfinished edit"
+      ],
+      "availability": "Native GUI available; no dedicated typed point manipulation contract yet"
+    },
+    {
+      "requirement": "R23",
+      "feature": "mask_registry_and_file_application",
+      "inputs": [
+        "existing mask file/owner",
+        "inclusive source zone",
+        "name/seed points/boxes",
+        "target effect scope"
+      ],
+      "outputs": [
+        "ProjectClip native mask registry",
+        "shape effect application",
+        "mask imported as editable bin media"
+      ],
+      "nativeApis": [
+        "ProjectClip::masks/addMask/masksUrls",
+        "MaskManager::applyMask/importMask",
+        "EffectStackModel::appendEffect"
+      ],
+      "acceptance": [
+        "list/read exact seeds and frame range",
+        "apply/import correct alpha and offset",
+        "undo/redo where native supports it",
+        "save/reopen metadata/files"
+      ],
+      "availability": "Shape and local mask file paths available without SAM dependencies"
+    },
+    {
+      "requirement": "R23",
+      "feature": "mask_remove_and_delete",
+      "inputs": [
+        "existing exact mask identity",
+        "registry-only removal or explicit physical-file deletion"
+      ],
+      "outputs": [
+        "updated native registry",
+        "optional irreversible file deletion"
+      ],
+      "nativeApis": [
+        "ProjectClip::removeMask",
+        "MaskManager::deleteMask"
+      ],
+      "acceptance": [
+        "absent mask rejected safely",
+        "registry serialization updated",
+        "save/reopen deletion remains deleted",
+        "physical deletion requires explicit acknowledgement"
+      ],
+      "availability": "Native bug identified: removeMask changes vector but not kdenlive:masks serialized property; no fix in current read-only audit"
+    },
+    {
+      "requirement": "R23",
+      "feature": "ai_mask_preview_and_seed_editing",
+      "inputs": [
+        "source range/cache-frame export",
+        "per-frame include/exclude points and boxes",
+        "SAM model/config/device/offload options"
+      ],
+      "outputs": [
+        "preview PNG per frame",
+        "editable native seed metadata",
+        "owned SAM process status"
+      ],
+      "nativeApis": [
+        "MaskManager::exportFrames",
+        "AutomaskHelper::launchSam/addMonitorControlPoint/addMonitorControlRect/generateImage/abortJob"
+      ],
+      "acceptance": [
+        "real model preview seed inclusion/exclusion",
+        "exact frame indexing",
+        "bounded stderr/progress and cancellation",
+        "no setup/download side effects during capabilities"
+      ],
+      "availability": "Unavailable: SAM2/Torch/runtime/model not found in native environment"
+    },
+    {
+      "requirement": "R23",
+      "feature": "ai_mask_propagation_and_packaging",
+      "inputs": [
+        "validated seed set",
+        "inclusive range",
+        "existing local model/config",
+        "new output path"
+      ],
+      "outputs": [
+        "propagated transparent PNG frames",
+        "FFV1 yuva420p MKV mask",
+        "thumbnail",
+        "native registry and optional shape effect"
+      ],
+      "nativeApis": [
+        "AutomaskHelper::generateMask",
+        "MaskTask::start/generateMask",
+        "ProjectClip::addMask"
+      ],
+      "acceptance": [
+        "exact alpha silhouette and frame count",
+        "seed/range persistence",
+        "cancel during SAM/encode/apply separately",
+        "exitCode and validated output before registry mutation"
+      ],
+      "availability": "Unavailable SAM prerequisites; FFmpeg FFV1 stage exists independently"
+    },
+    {
+      "requirement": "R29",
+      "feature": "native_whisper_recognition",
+      "inputs": [
+        "existing local Audio/AV source",
+        "explicit audio stream and inclusive range",
+        "installed native model",
+        "language/autodetect"
+      ],
+      "outputs": [
+        "word/segment timestamps",
+        "detected language",
+        "SRT",
+        "native editable transcript metadata"
+      ],
+      "nativeApis": [
+        "SpeechToTextWhisper",
+        "native whisper scripts",
+        "McpSpeech owned recognize/apply/transcript tools"
+      ],
+      "acceptance": [
+        "real reference speech timing/text",
+        "offline model loading",
+        "cancel/fail/source-change behavior",
+        "apply transcript and subtitles then save/reopen"
+      ],
+      "availability": "MCP pipeline implemented but native openai-whisper/Torch/SRT/models unavailable; faster-whisper package/cache is a different engine"
+    },
+    {
+      "requirement": "R29",
+      "feature": "native_vosk_recognition",
+      "inputs": [
+        "existing local Audio/AV source",
+        "stream/range",
+        "installed Vosk model whose language fixes recognition language"
+      ],
+      "outputs": [
+        "word timing/confidence",
+        "SRT",
+        "editable native transcript"
+      ],
+      "nativeApis": [
+        "SpeechToTextVosk",
+        "vosk/speechtotext.py and speech.py",
+        "McpSpeech tools"
+      ],
+      "acceptance": [
+        "real reference speech accuracy/timing",
+        "offline local model",
+        "cancel/failure",
+        "native transcript/subtitle persistence"
+      ],
+      "availability": "Vosk/SRT/native model directory unavailable"
+    },
+    {
+      "requirement": "R29",
+      "feature": "whisper_english_translation",
+      "inputs": [
+        "native multilingual non-turbo/non-.en model",
+        "source language/audio range"
+      ],
+      "outputs": [
+        "English word/subtitle output with source timing"
+      ],
+      "nativeApis": [
+        "native whisper task translate",
+        "McpSpeech task translate_english"
+      ],
+      "acceptance": [
+        "non-English reference speech produces English",
+        "proper unsupported-model refusals",
+        "timing and persistence"
+      ],
+      "availability": "Adapter exists; real execution unverified because native runtime/model absent"
+    },
+    {
+      "requirement": "R29",
+      "feature": "timeline_speech_scopes",
+      "inputs": [
+        "entire timeline",
+        "timeline zone",
+        "active audio/mirror track",
+        "selected timeline clip/range"
+      ],
+      "outputs": [
+        "mixed/selected timeline audio export",
+        "subtitles positioned on native timeline"
+      ],
+      "nativeApis": [
+        "SpeechDialog native scope controls",
+        "native render/export pipeline",
+        "SubtitleModel import"
+      ],
+      "acceptance": [
+        "respect mute/solo/track effects and timeline mix",
+        "exact zone offsets",
+        "cancel export/recognition/import",
+        "save/reopen subtitles"
+      ],
+      "availability": "Native GUI supports4scopes; current direct MCP speech adapter only accepts local Audio/AV bin files"
+    },
+    {
+      "requirement": "R29",
+      "feature": "seamless_multilingual_translation",
+      "inputs": [
+        "native source/target language",
+        "local Seamless model/runtime",
+        "audio/subtitle data"
+      ],
+      "outputs": [
+        "multilingual translated subtitles"
+      ],
+      "nativeApis": [
+        "SpeechDialog Seamless controls",
+        "scripts/whisper/seamlessquery.py",
+        "SpeechToTextWhisper optional deps"
+      ],
+      "acceptance": [
+        "real offline local model translation",
+        "bounded model selection",
+        "no accidental network fetch",
+        "cancel/persistence"
+      ],
+      "availability": "Not supported by current direct MCP adapter; transformers/sentencepiece/protobuf/model prerequisites need scoped setup"
+    },
+    {
+      "requirement": "R29",
+      "feature": "transcript_editing_and_assembly",
+      "inputs": [
+        "native bin transcript or completed job",
+        "word/silence replacement/removal/keep indices",
+        "returned source ranges"
+      ],
+      "outputs": [
+        "kdenlive:speech metadata",
+        "SRT import",
+        "timeline assembly through native insert tools"
+      ],
+      "nativeApis": [
+        "McpSpeech get/edit_speech_transcript",
+        "native TextBasedEdit",
+        "insert_media_streams/insert_clip",
+        "subtitle_file"
+      ],
+      "acceptance": [
+        "retained silence and inclusive source range boundaries",
+        "one undo per edit",
+        "text changes do not retime anchors",
+        "native save/reopen"
+      ],
+      "availability": "Metadata path implemented and tested with fixtures; real engine-generated transcript integration remains to verify"
+    },
+    {
+      "requirement": "R38",
+      "feature": "audio_capture_capabilities_and_monitoring",
+      "inputs": [
+        "actual Qt audio device identity",
+        "audio track",
+        "sample/channel configuration",
+        "monitor enable/disable"
+      ],
+      "outputs": [
+        "device list",
+        "monitor levels",
+        "ready/error state without recording"
+      ],
+      "nativeApis": [
+        "MediaCapture::getAudioCaptureDevices/changeMonitorState/switchMonitorState",
+        "Core::getAudioDevice"
+      ],
+      "acceptance": [
+        "real Qt device enumeration",
+        "device loss/permission denial",
+        "monitor start/stop cleanup",
+        "no recording while querying capabilities"
+      ],
+      "availability": "Qt audio capture compiled; actual Qt devices not enumerated in this audit (CIM read unavailable)"
+    },
+    {
+      "requirement": "R38",
+      "feature": "audio_voiceover_recording",
+      "inputs": [
+        "explicit recording instruction",
+        "document/sequence/audio track",
+        "countdown/arm/start/pause/resume/stop",
+        "new capture output"
+      ],
+      "outputs": [
+        "WAV capture",
+        "native recording duration/levels",
+        "finalized bin/timeline recording clip"
+      ],
+      "nativeApis": [
+        "MediaCapture::recordAudio/startCapture/pauseRecording/resumeRecording",
+        "Core::startMediaCapture/startRecording/stopMediaCapture/finalizeRecording"
+      ],
+      "acceptance": [
+        "controlled consented/virtual input audio",
+        "pause/resume duration and latency",
+        "stop waits for finalized file/import",
+        "cancel and device failure cleanup",
+        "native save/reopen"
+      ],
+      "availability": "Compiled native path; no recording attempted; hardware/virtual-device validation still required"
+    },
+    {
+      "requirement": "R38",
+      "feature": "new_and_existing_external_animation",
+      "inputs": [
+        "new .rawr path/duration/profile",
+        "existing animation source",
+        "Glaxnimate executable"
+      ],
+      "outputs": [
+        "native animation file",
+        "editable bin animation producer",
+        "external editor launch and saved changes"
+      ],
+      "nativeApis": [
+        "ClipCreationDialog::createAnimationClip",
+        "GlaxnimateLauncher::checkInstalled/openFile/openClip",
+        "Core::openExternalApp"
+      ],
+      "acceptance": [
+        "new file and modified animation reimport/render",
+        "correct duration/profile",
+        "launch failure distinct from completion",
+        "native save/reopen"
+      ],
+      "availability": "MLT glaxnimate-qt6 renderer installed; standalone Glaxnimate not found in PATH/standard checked paths or configured setting"
+    },
+    {
+      "requirement": "R38",
+      "feature": "external_animation_ipc_background",
+      "inputs": [
+        "timeline animation clip",
+        "background frame/seek position",
+        "external editor IPC connection"
+      ],
+      "outputs": [
+        "shared-memory background frames",
+        "frame synchronization and clean disconnect"
+      ],
+      "nativeApis": [
+        "GlaxnimateLauncher QLocalServer/QSharedMemory protocol"
+      ],
+      "acceptance": [
+        "actual external client handshake",
+        "background frame identity/timing",
+        "disconnect/failure cleanup",
+        "saved visible animation result"
+      ],
+      "availability": "Native implementation exists; standalone editor unavailable/unverified"
+    },
+    {
+      "requirement": "R38",
+      "feature": "online_search_preview_and_versions",
+      "inputs": [
+        "installed provider ID",
+        "query/page",
+        "provider result ID",
+        "version label"
+      ],
+      "outputs": [
+        "typed result metadata/license/author",
+        "preview",
+        "available download variants"
+      ],
+      "nativeApis": [
+        "ProvidersRepository",
+        "ProviderModel::slotStartSearch/slotFetchFiles",
+        "ResourceItemInfo"
+      ],
+      "acceptance": [
+        "per-provider real search contract",
+        "page/variant mapping",
+        "bounded network cancellation",
+        "no hidden login/download on capabilities"
+      ],
+      "availability": "6providerconfigs installed; no network, authentication, preview fetch or download attempted"
+    },
+    {
+      "requirement": "R38",
+      "feature": "online_download_import_and_attribution",
+      "inputs": [
+        "exact provider/result/version",
+        "new local destination",
+        "attribution decision",
+        "Freesound OAuth if needed"
+      ],
+      "outputs": [
+        "downloaded file",
+        "native bin import",
+        "project notes attribution"
+      ],
+      "nativeApis": [
+        "ProviderModel OAuth2",
+        "ResourceWidget::slotSaveItem/slotGotFile/abortDownload",
+        "addClip/addLicenseInfo signals"
+      ],
+      "acceptance": [
+        "real completed file size/hash/media decode",
+        "license/author metadata retained",
+        "no-overwrite publication",
+        "cancel/error removes only owned staging",
+        "native project save/reopen notes/media"
+      ],
+      "availability": "Native GUI flow exists; all provider/network/account prerequisites unverified"
+    }
+  ],
+  "excludedUpstreamDisabled": [
+    {
+      "name": "video/device/screen capture",
+      "evidence": "capture/mediacapture.cpp recordVideo commented TODO; capture/CMakeLists.txt mltdevicecapture.cpp commented; Core video capture branches commented",
+      "meaning": "Do not claim this currently disabled upstream feature exists through an MCP action name."
+    }
+  ],
+  "observedEnvironment": {
+    "python": "<user-home>/AppData/Local/Python/pythoncore-3.14-64/python.exe3.14.6",
+    "missingPythonMetadata": [
+      "torch",
+      "torchvision",
+      "SAM-2",
+      "vosk",
+      "openai-whisper",
+      "srt",
+      "transformers"
+    ],
+    "availableAlternativeMetadata": {
+      "faster-whisper": "1.2.1",
+      "ctranslate2": "4.8.2",
+      "numpy": "2.5.1",
+      "soundfile": "0.14.0"
+    },
+    "existingAlternativeModelCache": "models--Systran--faster-whisper-large-v3 directory exists; cache completeness/model loading not checked; not a native Whisper .pt model",
+    "nativeModelAndVenvCheck": "No venv/venv-sam/sam2models/speechmodels/Whisper model directories found in checked native AppLocal/Roaming/default roots; no model lookup methods with side effects called",
+    "ffmpegFiltersPresent": [
+      "select",
+      "showinfo",
+      "scdet",
+      "deshake",
+      "lut3d"
+    ],
+    "vidstab": "NativeMLTmodule/library absent; originalCraft MOD_VIDSTAB=OFF; checkedFFmpeglacksvidstabdetect/transform",
+    "glaxnimate": "MLT renderer DLL present; executable not found in PATH/configured field/checked standard paths; no launch",
+    "onlineProviders": [
+      "Internet Archive Movies",
+      "Freesound",
+      "Pexels Photos",
+      "Pexels Video",
+      "Pixabay Photos",
+      "Pixabay Videos"
+    ],
+    "providerAuth": "Freesound downloadOAuth2=true; Pexels/Pixabay configs use API-key placeholders; availability/account state not queried; no key values read",
+    "capture": "QtMediaCapture audio path compiled; Win32CIMdevice query unavailable; no audio recording or stream started"
+  },
+  "prioritizedModules": [
+    {
+      "order": 1,
+      "name": "native analysis jobs",
+      "initial": "Scene detection with immutable terminal outcome and explicit result publication",
+      "requirements": [
+        "owned jobID and cancellation",
+        "exitCode+failure reason+bounded logs",
+        "snapshot source/profile/category identity",
+        "result readback before completed",
+        "atomic marker/subclip apply and one undo",
+        "native save/reopen"
+      ],
+      "then": [
+        "Stabilize after native vidstab dependency is available",
+        "registered custom-job schemas and output kinds"
+      ]
+    },
+    {
+      "order": 2,
+      "name": "manual masks and persisted mask registry",
+      "initial": "Finish roto input/render guard then list/apply/import/remove native masks",
+      "requirements": [
+        "native request validation",
+        "mask serialization repair on removal",
+        "typed exact seed/range results",
+        "separate registry removal vs acknowledged physical deletion",
+        "alpha render/persistence"
+      ]
+    },
+    {
+      "order": 3,
+      "name": "ASR environment and timeline recognition",
+      "initial": "Decide explicit supported native environment/model setup after user scope authorization; do not silently substitute faster-whisper",
+      "requirements": [
+        "offline local package/model probing",
+        "real Whisper and Vosk reference speech tests",
+        "translate-English capability proof",
+        "native timeline mix/zone/track/selection export",
+        "transcript/SRT application and persistence"
+      ]
+    },
+    {
+      "order": 4,
+      "name": "SAM2 mask jobs",
+      "initial": "Observational prereqs then seed preview/propagation/package/apply owned pipeline",
+      "requirements": [
+        "pinned local model/config/runtime",
+        "separate stage statuses and cancellation",
+        "exact alpha timing",
+        "no incidental setup/download",
+        "native registry and file persistence"
+      ]
+    },
+    {
+      "order": 5,
+      "name": "capture/external animation/online resources",
+      "initial": "Independent typed modules; first capabilities, then only explicitly requested side-effecting workflows",
+      "requirements": [
+        "Qt device and Glax executable proof",
+        "recording consented or virtual input fixture",
+        "external editor completion readback",
+        "provider search/version/license schemas",
+        "owned downloads/cancel/auth and no-overwrite publication"
+      ]
+    }
+  ],
+  "concreteNativeIssues": [
+    {
+      "where": "jobs/StabilizeTask,SceneSplitTask,CustomJobTask",
+      "issue": "NormalExit alone accepted without checking exitCode; no immutable terminal result signal, queued apply can outlive task registration",
+      "action": "Native outcome contracts before generic MCP job completion claims"
+    },
+    {
+      "where": "jobs/SceneSplitTask::start",
+      "issue": "Selected subclip IDs are split but input range is not passed to task; analysis still uses full source",
+      "action": "Expose honest full-source contract or repair/test explicit source range"
+    },
+    {
+      "where": "ProjectClip::removeMask",
+      "issue": "Does not refresh kdenlive:masks serialized property; absent name passes index-1 to vector remove",
+      "action": "Validate identity and repair persisted removal before save/reopen coverage"
+    },
+    {
+      "where": "MLT plusgpl/filter_rotoscoping.c",
+      "issue": "Fixed nodeX[1024] and curve subdivision allocation need a substantive dependency repair for larger complex edited masks",
+      "action": "Keep current request-only guard until separately repaired/validated; existing larger project readback remains reachable"
+    }
+  ],
+  "featureContractCount": 21
+}

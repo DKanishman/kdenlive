@@ -1,0 +1,28 @@
+{
+  "status": "staging; no broad source applied",
+  "nativeFixes": ["signed short-correlation lags; empty vectors; finite overflow-resistant scores", "BWF samples and millisecond timecode normalized to project frames; sample-rate validation; legitimate zero timecode", "AudioEnvelope exact source cut, selected stream, decode failures, empty normalization, cancellation and owned active children"],
+  "contracts": {
+    "start_alignment_job": {"mode": "audio|timecode", "reference": {"clipId": "native timeline ID", "streamId": "explicit actual source audio stream for audio mode"}, "targets": [{"clipId": "native timeline ID", "streamId": "explicit actual audio stream for audio mode"}], "includeGroups": "explicit boolean", "maxShiftFrames": "optional bounded lag search", "expectedState": "fresh native state; captured with immutable inputs", "result": "accepted job ID; no timeline movement"},
+    "alignment_job_status": "owned job ID; queued/decoding/correlating/ready/failed/cancelling/cancelled/obsolete plus terminal reason, actual proposed target frames, correlation quality and source/range provenance",
+    "cancel_alignment_job": "owned cancellation; routable before document readiness and receipt mutation blocking; explicit worker/process completion",
+    "apply_alignment": "job ID plus exact captured/fresh expectedState; one native undo transaction over deduplicated group roots; preflight all tracks, negative positions, collisions and moved IDs; weak/ambiguous audio evidence requires explicit acknowledgement; no automatic edits on decoder completion",
+    "multicam_cut": "explicit angle video track IDs, sorted nonoverlapping half-open selections {trackId,startFrame,endFrame}, preserve existing audio payload/timing, explicit acknowledgement if native lift splits AV grouping; native extractZoneWithUndo and one complete rollback/history entry",
+    "set_time_maps": "explicit per-member maps covering each selected native group leaf; each member has its own duration/endpoints/source bounds. Existing equal-duration shorthand remains compatible. Native audio/AV remap enabled and verified, including silence for freeze or native |speed|<0.1 or>10."
+  },
+  "audioImplementation": {
+    "decode": "owned ffmpeg QProcess using actual stream IDs and visible source ranges, immutable local input metadata, bounded mono PCM output; no pCore access from worker",
+    "correlation": "existing FFTCorrelation float primitive with explicit lag/overlap search; normalized peak/ambiguity metrics recomputed on original envelopes; silence/empty/decode errors never produce ready proposals",
+    "ownership": "QObject session service owns QProcess, QFutureWatcher and temporary directory; cancellation kills only its process and cooperatively stops pure-vector computation; job terminal state records explicit success/failure/cancel rather than inferring task disappearance",
+    "guards": "captured document/sequence/state token plus source identity/ranges/path size/mtime; stale or relinked sources obsolete proposal. Bounds on clip count, total analyzed frames, PCM bytes, decoder duration and retained jobs."
+  },
+  "fixtures": [
+    "deterministic amplitude-modulated nonrepeating 48kHz PCM with delayed/advanced copies, noise and gain; both short<=200frame and FFT>200frame inputs",
+    "trimmed source windows with nonzero source-in, negative and positive lag, same-bin clips, missing/invalid stream and silent/periodic ambiguity",
+    "two AV-split groups with distinct tracks; atomic multi-target move, collision rollback, locked partner, stale manual trim/group/relink, cancellation during decode/correlation",
+    "BWF time_reference at known sample rate, valid zero TC, missing/zero sample rate, overflow and long offsets; MOV timecode stream and drop-frame rational project FPS",
+    "three synchronized color/indexed-frame angles with distinct scratch tones and separate master sync tone; multicam cuts must show selected indexed frames and bit-identical master audio after undo/redo/save/reopen/render",
+    "audio-only and AV-split time maps for ramp/reverse/freeze, unequal member duration, nonzero source-in, trim/disable restore, pitch/blending readback; decoded samples/frequency and frame labels verify behavior, not map strings alone"
+  ],
+  "integration": ["mcpadvancedediting catalog/callTool", "early alignment status/cancel routing", "McpWire cancellation exemption", "McpAdvancedEditingAccess friend for atomic group-root operations", "CMake module + tests", "native GUI alignment failure/cancel reporting and deleted reference guard"],
+  "nativeRisks": ["TimelineFunctions extractZoneWithUndo breaks groups crossing unselected tracks; preserve explicit audio and report group changes", "Time-map disable ignores native resize result; regression required before admitting unequal-duration grouped disable", "Native timeremap GUI refuses B-frame codecs; typed path must enforce decoded metadata/preparation or prove affected output", "Existing FFT amplitude scores are scaled and cannot be treated directly as normalized confidence"]
+}

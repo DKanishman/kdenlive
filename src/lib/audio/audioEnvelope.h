@@ -10,6 +10,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "audioInfo.h"
 #include <QFutureWatcher>
 #include <QObject>
+#include <QString>
+#include <atomic>
 #include <memory>
 #include <mlt++/Mlt.h>
 #include <vector>
@@ -50,6 +52,10 @@ public:
     const std::vector<qint64> &envelope();
 
     QImage drawEnvelope();
+    void cancel();
+    bool isFinished() const;
+    bool wasCancelled() const;
+    QString error();
 
     size_t offset();
 
@@ -72,6 +78,7 @@ private:
         std::vector<qint64> audioAmplitudes;
         // Maximum absolute value of the elements in 'audioAmplitudes'.
         qint64 amplitudeMax = 0;
+        QString error;
     };
 
     /**
@@ -93,8 +100,12 @@ private:
     size_t m_offset;
     const int m_clipId;
     const size_t m_startpos;
-    size_t m_envelopeSize;
+    size_t m_envelopeSize{0};
+    QString m_inputError;
+    mutable std::atomic_bool m_cancelled{false};
+    bool m_started{false};
 
 Q_SIGNALS:
     void envelopeReady(AudioEnvelope *envelope);
+    void progress(int percent);
 };

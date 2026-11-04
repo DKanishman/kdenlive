@@ -19,8 +19,8 @@
 #include "trackmodel.hpp"
 #include <QDebug>
 #include <effects/effectsrepository.hpp>
-#include <mlt++/MltProducer.h>
 #include <limits>
+#include <mlt++/MltProducer.h>
 #include <utility>
 
 ClipModel::ClipModel(const std::shared_ptr<TimelineModel> &parent, std::shared_ptr<Mlt::Producer> prod, const QString &binClipId, int id,
@@ -748,7 +748,7 @@ int64_t ClipModel::getStartTimecodeOffset() const
     auto binClip = pCore->projectItemModel()->getClipByBinID(m_binClipId);
     int recTC = binClip->getStartTimecode();
     if (recTC >= 0) {
-        return recTC + getIn();
+        return qint64(recTC) + getIn();
     }
     return -1;
 }
@@ -884,8 +884,7 @@ void ClipModel::refreshProducerFromBin(int trackId, PlaylistState::ClipState sta
         in = int(clampedIn);
         out = int(clampedOut);
         // Prevent going out of the clip's range.
-        const qint64 maxOut64 = qBound<qint64>(qint64(0), qRound64(double(m_producer->get_length()) * speedRatio) - 1,
-                               qint64(std::numeric_limits<int>::max()));
+        const qint64 maxOut64 = qBound<qint64>(qint64(0), qRound64(double(m_producer->get_length()) * speedRatio) - 1, qint64(std::numeric_limits<int>::max()));
         out = qMin(out, int(maxOut64));
         m_speed = speed;
     }
