@@ -32,7 +32,7 @@ python3 -B dev-tools/mcp-linux.py build --jobs 2
 
 The build command clones MLT at the exact revision in
 [the dependency patch instructions](../packaging/patches/README.md), checks and
-applies all six patches, builds/installs it locally, checks essential runtime
+applies all seven patches, builds/installs it locally, checks essential runtime
 modules and runs its native CTest suite. It then configures/builds this editor,
 runs MCP, subtitle, group, sequence, marker, OTIO, FFT and Python suites, and
 installs the editor only after those checks pass. Its own effect/export preset
@@ -84,31 +84,63 @@ also includes the configured build revision.
 
 ## Current verification and remaining work
 
-The current source is on `codex/mcp-linux-completion`. The patched MLT 7.43.0
-checkout and separate local installation exist. All six dependency patches are
-registered in the helper. Current verification passes all 21 native MLT tests
-and all 201 source-schema/runtime-query tests. Logs are in
-`build-mcp-linux/verification-logs/mlt-native-current.log` and
-`mlt-schema-current.log`.
+Branch: `codex/mcp-linux-completion`. The editor and native tests compile against private patched MLT 7.43.0. All 222
+MLT tests and all eleven selected editor/connector suites pass. The native MCP
+suite passes all 164 cases, including the unchanged roto pixel assertions after
+the cJSON isolation repair. The full Python suite passes 40 cases with one
+Windows-only skip. A repeat with source held unchanged passed and installed the
+editor with a matching build receipt.
 
-Kdenlive has configured successfully against that local MLT prefix. Its
-incremental editor build is running; the modified audio correlation and envelope
-sources compile. Project notes/non-destructive cleanup and their native tests
-are registered, but their execution and the complete editor build are not yet
-verified. There is no successful build receipt or verified native editor install.
+The installed app launched visibly on this laptop through an on-demand local
+connector. Its executable hash and loaded private libraries were checked through
+`/proc`. Real MCP initialize, 122-tool discovery, capabilities, project state and
+native UI inspection pass. Exact timeline edits, undo/redo, notes, normal Save As,
+reopen and real H.264 export pass; decoded frames are red/blue as requested.
+The app was returned to a blank project after preserving its test fixture.
+Full editor coverage remains false; tool count is not coverage evidence.
 
-The current Python suite runs 38 tests: 36 pass, one Windows-only case is skipped,
-and the real Linux AF_UNIX roundtrip fails at socket creation with EPERM. This is
-an active sandbox restriction. Writable project files and working child-process
-stdio pipes do not establish permission to create or connect native Unix sockets.
-No test suppresses or skips that Linux restriction. The editor's current MCP
-endpoint requires local Unix IPC; no TCP listener or remote relay is used.
+The personal on-demand stdio wrapper is stored outside the source under
+`/home/dk/.codex/work/kdenlive-mcp-launch/connect.py`. It launches only the verified
+build, serializes launch attempts using a private local lock, never deletes an
+existing endpoint, and hands requests to the existing bounded same-user bridge
+without consuming/replaying them. A desktop entry named **Kdenlive MCP (local
+build)** and Codex MCP server `kdenlive` are configured. The user's previous Codex
+configuration bytes were preserved, with a private backup. Current-chat tool
+catalog refresh is not yet verified; the local connector itself has been tested.
+The wrapper uses separate native settings and only local stdio/Unix transport.
 
-Full editor coverage remains incomplete. The alignment/multicam/time-map
-contracts, source creation, archive/library/OTIO workflows, specialized analysis
-and masks, and persistent render queue still require implementation and native
-behavior/persistence verification. The WIP branch has not been merged wholesale.
+### This laptop's private runtime prerequisites
 
-The original and resumed changes are preserved. See
-[mcp-progress.md](mcp-progress.md) for the historical checkpoints and
-[mcp-linux-verification.json](mcp-linux-verification.json) for current evidence.
+The host has Qt/KF development packages but lacked `org.kde.desktop` and Qt's WebP
+image plugin. Signed x86_64 Fedora `kf6-qqc2-desktop-style` 6.31.0-1 and
+`qt6-qtimageformats` 6.11.2-1 packages were verified and unpacked under
+`build-mcp-linux/qt-runtime`. `runtime_env` prepends their QML/plugin directories.
+No system installation was changed. A normal system installation of those
+runtime packages is also sufficient.
+
+Fedora's ffmpeg-free lacks libx264. For the existing positive H.264/transcode tests,
+a private libavcodec was built from FFmpeg n9.0.2 commit
+`946fcce07b6dcd0331c8cc609192aeff5e1924f8` with x264 stable commit
+`31e19f92f00c7003fa115047ce50978bc98c3a0d`. Both sources came from their GitHub
+repositories. The build enables GPL/shared/libx264 and disables x86 assembly
+because no assembler is installed. This is a local development runtime, not a
+portable distribution package. Only libavcodec and libx264 override the host
+libraries; system FFmpeg tools and the matching system avformat/avfilter/avutil
+libraries remain in use, preserving ASS/subtitle filters. Other optional external
+encoders still require their own dependencies; query native preset availability.
+Do not install an entire minimal FFmpeg stack over the full system filter runtime.
+
+First-run setup is native UI. The isolated QA profile selected installed `dv_pal`,
+private melt/render paths and SDL2 dummy audio; it did not alter user projects or
+stock Flatpak settings. Runtime/socket tests use approved execution because this
+chat's ordinary commands still cannot bind local sockets or resolve GitHub.
+Git reads and real source downloads succeed through approved execution. This is
+not unrestricted access, and new project dependencies/servers need their own checks.
+
+### Work still required
+
+The matched installation, live core workflows and on-demand local setup pass.
+Full feature-contract completion and wider audiovisual/persistence verification
+remain required. Alignment, multicam, source creation, checked interchange,
+library/archive, analysis/masks/AI, persistent queue and other pending contracts
+are tracked in the project progress notes. Full editor coverage remains false.

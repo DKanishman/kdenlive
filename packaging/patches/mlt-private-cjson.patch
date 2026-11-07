@@ -1,0 +1,17 @@
+diff --git a/src/modules/plusgpl/CMakeLists.txt b/src/modules/plusgpl/CMakeLists.txt
+index e9bd982e..56e567ea 100644
+--- a/src/modules/plusgpl/CMakeLists.txt
++++ b/src/modules/plusgpl/CMakeLists.txt
+@@ -11,6 +11,12 @@ add_library(mltplusgpl MODULE
+   utils.c utils.h
+ )
+ 
++# This bundled legacy cJSON has a different public structure/type ABI from
++# modern libcjson. Keep it local to this module when a host links libcjson.
++if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
++  set_source_files_properties(cJSON.c PROPERTIES COMPILE_OPTIONS -fvisibility=hidden)
++endif()
++
+ file(GLOB YML "*.yml")
+ add_custom_target(Other_plsugpl_Files SOURCES
+   ${YML}

@@ -30,6 +30,7 @@ PATCHES = (
     "mlt-xml-windows-getcwd.patch",
     "mlt-rotoscoping-bounds.patch",
     "mlt-metadata-validation.patch",
+    "mlt-private-cjson.patch",
 )
 KWALIFY_VERSION = "0.7.2"
 REQUIRED_TOOLS = ("git", "cmake", "ctest", "ninja", "cc", "c++", "pkg-config", "ffmpeg")
@@ -104,6 +105,12 @@ def runtime_env(root, *, isolated=False):
         fallback = "/usr/local/share:/usr/share" if key == "XDG_DATA_DIRS" else ""
         env[key] = ":".join(map(str, paths)) + ":" + (env.get(key) or fallback)
         env[key] = env[key].rstrip(":")
+    # Optional distribution runtime packages can be unpacked into this private
+    # tree when installing system-wide Qt dependencies is not available.
+    qt = root / "qt-runtime/usr/lib64/qt6"
+    for variable, directory in (("QML_IMPORT_PATH", qt / "qml"), ("QT_PLUGIN_PATH", qt / "plugins")):
+        if directory.is_dir():
+            env[variable] = str(directory) + (":" + env[variable] if env.get(variable) else "")
     env.update(MLT_REPOSITORY=str(prefix / "lib/mlt-7"),
                MLT_DATA=str(prefix / "share/mlt-7"),
                MLT_PROFILES_PATH=str(prefix / "share/mlt-7/profiles"),

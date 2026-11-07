@@ -1871,10 +1871,11 @@ void AssetParameterModel::setParameters(const paramVector &params, bool update)
             if (km) {
                 km->refresh();
                 ParamRow currentRow = m_params.at(param.first);
-                if (currentRow.type == ParamType::Roto_spline) {
-                    // Reset monitor view
-                    auto monitor = pCore->getMonitor(monitorId);
-                    monitor->setUpEffectGeometry(QVariantList());
+                if (currentRow.type == ParamType::Roto_spline && pCore->monitorManager()) {
+                    // Native model tests and early initialization have no monitors.
+                    if (auto monitor = pCore->getMonitor(monitorId)) {
+                        monitor->setUpEffectGeometry(QVariantList());
+                    }
                 }
             }
         }

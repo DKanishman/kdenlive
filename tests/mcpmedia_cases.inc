@@ -488,3 +488,33 @@ TEST_CASE("MCP explicit video placement can overlap a native composition", "[MCP
     project.success(QStringLiteral("redo"), project.expected()); CHECK(project.timeline->isClip(clip));
     REQUIRE(project.timeline->checkConsistency());
 }
+
+TEST_CASE("MCP export verification rejects duration-correct files with missing requested streams", "[MCP][MCPRender]")
+{
+    MediaFfmpeg ffmpeg;
+    QTemporaryDir directory;
+    REQUIRE(directory.isValid());
+    const auto audioPath = directory.filePath(QStringLiteral("audio-only.wav"));
+    mediaProcess(ffmpeg.path, {QStringLiteral("-v"), QStringLiteral("error"), QStringLiteral("-f"), QStringLiteral("lavfi"),
+                              QStringLiteral("-i"), QStringLiteral("sine=frequency=440:sample_rate=48000:duration=1"),
+                              QStringLiteral("-c:a"), QStringLiteral("pcm_s16le"), audioPath});
+    const auto videoPath = directory.filePath(QStringLiteral("video-only.mkv"));
+    mediaProcess(ffmpeg.path, {QStringLiteral("-v"), QStringLiteral("error"), QStringLiteral("-f"), QStringLiteral("lavfi"),
+                              QStringLiteral("-i"), QStringLiteral("color=c=red:s=32x32:r=25:d=1"),
+                              QStringLiteral("-c:v"), QStringLiteral("ffv1"), QStringLiteral("-an"), videoPath});
+    Mlt::Profile profile("dv_pal");
+    Mlt::Producer audio(profile, "avformat", audioPath.toUtf8().constData());
+    Mlt::Producer video(profile, "avformat", videoPath.toUtf8().constData());
+    REQUIRE(audio.is_valid());
+    REQUIRE(video.is_valid());
+    CHECK(audio.get_length() == 25);
+    CHECK(video.get_length() == 25);
+    QString reason;
+    CHECK_FALSE(McpRender::verifyStreams(audio, profile, true, true, reason));
+    CHECK_FALSE(reason.isEmpty());
+    reason.clear();
+    CHECK_FALSE(McpRender::verifyStreams(video, profile, true, true, reason));
+    CHECK_FALSE(reason.isEmpty());
+    CHECK(McpRender::verifyStreams(audio, profile, false, true, reason));
+    CHECK(McpRender::verifyStreams(video, profile, true, false, reason));
+}

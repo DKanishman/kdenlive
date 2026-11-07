@@ -440,7 +440,9 @@ TEST_CASE("MCP nested context menus retain ancestor closure when the submenu is 
     submenu->setTitle(QStringLiteral("Nested context"));
     // Give the native popup an actual submenu owner after selecting the
     // deliberately reversed inventory order; addMenu(QMenu*) does not reparent.
-    submenu->setParent(root);
+    // QWidget::setParent without flags turns a warmed popup into a child
+    // widget. Preserve QMenu's popup window type when changing ownership.
+    submenu->setParent(root, submenu->windowFlags());
     root->addMenu(submenu);
     auto *action = submenu->addAction(QStringLiteral("Context operation"));
     action->setObjectName(QStringLiteral("mcp-quick-context-ordered-leaf"));

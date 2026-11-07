@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "doc/kthumb.h"
+#include "mcp/mcprendercheck.h"
 #include "kdenlivesettings.h"
 #include "renderpresets/renderpresetmodel.hpp"
 #include "renderpresets/renderpresetrepository.hpp"
@@ -38,6 +39,45 @@ TEST_CASE("MCP lifecycle catalogs expose native profiles presets and bounded job
     QJsonObject cancel = project.expected();
     cancel.insert(QStringLiteral("jobId"), QStringLiteral("another-session"));
     project.rejectWithoutChange(QStringLiteral("cancel_render"), cancel);
+}
+
+TEST_CASE("MCP rejects unavailable native codecs before starting export", "[MCP][MCPLifecycle][MCPRender]")
+{
+    McpProject project;
+    project.open();
+    QTemporaryDir directory;
+    REQUIRE(directory.isValid());
+    project.success(QStringLiteral("add_color_clip"), project.colorArgs(project.videoTracks.front(), 0, 5));
+    const auto names = RenderPresetRepository::get()->getAllPresets();
+    REQUIRE_FALSE(names.isEmpty());
+    const QString id = names.front();
+    auto &slot = RenderPresetRepository::get()->getPreset(id);
+    struct RestorePreset {
+        std::unique_ptr<RenderPresetModel> &slot;
+        std::unique_ptr<RenderPresetModel> previous;
+        ~RestorePreset() { slot = std::move(previous); }
+    } restore{slot, std::move(slot)};
+    QDomDocument document;
+    auto element = document.createElement(QStringLiteral("profile"));
+    element.setAttribute(QStringLiteral("name"), QStringLiteral("Unavailable native test codec"));
+    element.setAttribute(QStringLiteral("extension"), QStringLiteral("mp4"));
+    element.setAttribute(QStringLiteral("args"), QStringLiteral("f=mp4 vcodec=kdenlive_mcp_no_such_encoder acodec=aac"));
+    slot = std::make_unique<RenderPresetModel>(element, QString(), false, QStringLiteral("custom"));
+    REQUIRE(slot->isValid()); // Structural validity alone does not establish codec availability.
+    REQUIRE_FALSE(slot->error().isEmpty());
+    const auto listing = project.success(QStringLiteral("list_render_presets"), {{QStringLiteral("presetName"), id}})
+                             .value(QStringLiteral("presets")).toArray();
+    REQUIRE(listing.size() == 1);
+    CHECK_FALSE(listing.first().toObject().value(QStringLiteral("valid")).toBool());
+    CHECK_FALSE(listing.first().toObject().value(QStringLiteral("typedExportSupported")).toBool());
+    auto args = project.expected();
+    args.insert(QStringLiteral("presetName"), id);
+    const QString target = directory.filePath(QStringLiteral("unavailable.mp4"));
+    args.insert(QStringLiteral("path"), target);
+    project.rejectWithoutChange(QStringLiteral("start_render"), args);
+    CHECK_FALSE(QFileInfo::exists(target));
+    CHECK(project.success(QStringLiteral("render_status")).value(QStringLiteral("jobs")).toArray().isEmpty());
+    CHECK(QDir(directory.path()).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot).isEmpty());
 }
 
 TEST_CASE("MCP exact preview snapshots render requested frames and refuse output replacement", "[MCP][MCPLifecycle]")

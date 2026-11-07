@@ -31,6 +31,14 @@ Do not copy a new dependency DLL into an editor process that is already running.
   module descriptions and a missing folded-scalar marker in RGBLUT metadata.
   The source-schema and runtime-query validation suites check these files.
 
+- `mlt-private-cjson.patch` hides the bundled legacy cJSON implementation inside
+  the PlusGPL module. Kdenlive links modern `libcjson` through its host libraries;
+  the two versions use incompatible JSON type constants. ELF symbol interposition
+  previously let the module parse with the other library, silently ignoring valid
+  roto splines. Only `cJSON.c` gets hidden visibility; `mlt_register` stays exported.
+  The editor's native roto validation/pixel/undo case exercises this loaded-module
+  interaction, beyond the standalone MLT geometry regression.
+
 Apply each patch from the MLT source root with `git apply --check <patch>` and
 then `git apply <patch>`. Apply the documented sequence; test registration files
 can be shared by patches. They are not applied automatically by Kdenlive's build;

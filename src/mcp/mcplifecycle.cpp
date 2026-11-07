@@ -14,6 +14,7 @@
 #include "kdenlivesettings.h"
 #include "mcphelpers.h"
 #include "mcpquick.h"
+#include "mcprendercheck.h"
 #include "mcpsequence.h"
 #include "mcpserver.h"
 #include "monitor/monitor.h"
@@ -44,6 +45,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <mlt++/MltFrame.h>
 #include <mlt++/MltProducer.h>
 #include <mlt++/MltProfile.h>
 #ifdef Q_OS_WIN
@@ -263,7 +265,8 @@ QJsonObject nativeOutput(const RenderRequest::RenderJob &job, QString &error)
             {key("outFrame"), out},
             {key("expectedFrameCount"), out - in + 1},
             {key("subtitlePath"), job.subtitlePath},
-            {key("audioOnly"), consumer.attribute(key("video_off")).toInt() == 1 || consumer.attribute(key("vn")).toInt() == 1}};
+            {key("audioOnly"), consumer.attribute(key("video_off")).toInt() == 1 || consumer.attribute(key("vn")).toInt() == 1},
+            {key("audioDisabled"), consumer.attribute(key("audio_off")).toInt() == 1 || consumer.attribute(key("an")).toInt() == 1}};
 }
 class RenderOutputVerifier : public QObject
 {
@@ -348,8 +351,19 @@ private:
         }
         int frames = 0;
         {
-            Mlt::Producer rendered(m_profile, path.toUtf8().constData());
-            if (rendered.is_valid()) frames = rendered.get_length();
+            // Explicit avformat avoids an audio visualization being mistaken for video.
+            Mlt::Producer rendered(m_profile, "avformat", path.toUtf8().constData());
+            if (!rendered.is_valid()) {
+                finish(false, key("Native rendered media cannot be opened."));
+                return false;
+            }
+            QString reason;
+            if (!McpRender::verifyStreams(rendered, m_profile, !m_output.value(key("audioOnly")).toBool(),
+                                          !m_output.value(key("audioDisabled")).toBool(), reason)) {
+                finish(false, reason);
+                return false;
+            }
+            frames = rendered.get_length();
         }
         const int expected = m_output.value(key("expectedFrameCount")).toInt();
         const int tolerance = m_output.value(key("audioOnly")).toBool() ? 1 : 0;
@@ -584,12 +598,12 @@ QJsonObject KdenliveMcpServer::callLifecycleTool(const QString &name, const QJso
             QJsonObject item{{key("id"), id},
                              {key("name"), preset->name()},
                              {key("extension"), preset->extension()},
-                             {key("valid"), preset->isValid()},
+                             {key("valid"), preset->isValid() && preset->error().isEmpty()},
                              {key("error"), preset->error()},
                              {key("warning"), preset->warning()},
                              {key("category"), preset->groupId()},
                              {key("imageSequence"), preset->params().isImageSequence()},
-                             {key("typedExportSupported"), preset->isValid() && preset->renderer() == key("avformat")},
+                             {key("typedExportSupported"), preset->isValid() && preset->error().isEmpty() && preset->renderer() == key("avformat")},
                              {key("audioOnly"), preset->hasParam(key("video_off")) || preset->hasParam(key("vn"))},
                              {key("videoQualities"), strings(preset->videoQualities())},
                              {key("audioQualities"), strings(preset->audioQualities())},
@@ -846,8 +860,8 @@ QJsonObject KdenliveMcpServer::callLifecycleTool(const QString &name, const QJso
         if (!RenderPresetRepository::get()->presetExists(presetName))
             return failure(key("INVALID_PRESET"), key("Choose a native installed export preset."), state);
         const auto &preset = RenderPresetRepository::get()->getPreset(presetName);
-        if (!preset || !preset->isValid() || preset->renderer() != key("avformat"))
-            return failure(key("INVALID_PRESET"), key("Choose a valid installed native avformat preset."), state);
+        if (!preset || !preset->isValid() || !preset->error().isEmpty() || preset->renderer() != key("avformat"))
+            return failure(key("INVALID_PRESET"), key("Choose an available native avformat preset without codec or format errors."), state);
         const bool imageSequence = preset->params().isImageSequence();
         const bool guides = arguments.value(key("guideSections")).toBool(false);
         const bool stems = arguments.value(key("audioFilePerTrack")).toBool(false);

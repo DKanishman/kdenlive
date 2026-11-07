@@ -105,3 +105,45 @@ No successful native editor install or live local MCP session is claimed yet.
 The wider alignment, source-creation, interchange/library/archive, analysis,
 mask/AI/speech, persistent render queue and remaining feature contracts in
 mcp.md and the preserved WIP design inventory remain completion gates.
+
+## Native connection and Linux runtime verification — 7 November 2026
+
+The local test editor exposed a real Unix endpoint and answered initialize,
+122-tool discovery, capabilities and state. Disposable live edits, exact color
+preview pixels, undo/redo, notes, normal Save As and reopen passed. This was an
+earlier development binary; final installed-binary verification remains required.
+
+The editor and all selected native test binaries compile. Mask removal's native
+regression passes. Two nested-menu cases pass after preserving the popup window
+flags when reparenting a warmed submenu. Rendering now checks actual preset
+codec/format errors and rejects missing requested streams; real video-only and
+audio-only fixtures prevent accepting duration alone as proof of export.
+
+Private signed Qt runtime packages resolve the missing desktop style/WebP plugin.
+A pinned private libavcodec/x264 build enables H.264, retaining system format,
+filter and utility libraries so ASS subtitles remain available. No system codec
+or stock Flatpak package was replaced. GitHub source downloads and native local
+IPC work through approved execution; ordinary GitHub DNS remains restricted.
+
+The latest complete MCP suite reached 163/164 cases. Roto alpha checks exposed
+legacy cJSON symbols in PlusGPL binding to modern host libcjson. Seventh patch
+`mlt-private-cjson.patch` hides only that bundled implementation and preserves
+`mlt_register`. Its rebuilt module exports no cJSON symbols. A complete MLT and
+eleven-suite editor verification/install job is now running. No successful editor
+install receipt has been issued yet; full editor coverage is still false.
+
+### Tested installed checkpoint
+
+All 222 MLT checks and eleven selected editor/connector suites pass. The complete
+MCP suite passes 164 native cases after cJSON isolation, with the original roto
+pixel assertions intact. An unchanged-source repeat passed and installed the
+editor with executable SHA256
+`233833609d69826a2726f1b243e5a3e40cc05b377e37d6e0576985fe2ec7d0a6`.
+
+The installed app launched visibly through the private on-demand connector.
+Its `/proc` executable/library provenance, initialize/tool/state/UI reads, native
+timeline edits, undo/redo, notes, normal Save As/reopen and actual H.264 export
+passed. Decoded red/blue pixels were [252,0,0] and [0,0,253]. The app was returned
+to a new blank project. The desktop launcher and local-only Codex MCP entry are
+configured, preserving prior settings. Current-chat catalog refresh has not been
+verified. Full editor coverage and the broader contracts above remain unfinished.
