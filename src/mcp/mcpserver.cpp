@@ -7,6 +7,7 @@
 #include "mcpmedia.h"
 #include "mcpmonitor.h"
 #include "mcpprofiles.h"
+#include "mcpprojectextras.h"
 #include "mcpquick.h"
 #include "mcpsequence.h"
 #include "mcpspeech.h"
@@ -35,6 +36,7 @@
 
 #include <QApplication>
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QDomDocument>
 #include <QFile>
@@ -373,7 +375,7 @@ QJsonArray KdenliveMcpServer::toolCatalog()
     }
     for (const auto &catalog :
          {timeline, effectToolCatalog(), lifecycleToolCatalog(), uiToolCatalog(), McpQuick::toolCatalog(), McpMedia::toolCatalog(), McpMonitor::toolCatalog(),
-          McpProfiles::toolCatalog(), McpSpeech::toolCatalog(), McpMarkers::toolCatalog(), McpTitles::toolCatalog()})
+          McpProfiles::toolCatalog(), McpSpeech::toolCatalog(), McpMarkers::toolCatalog(), McpTitles::toolCatalog(), McpProjectExtras::toolCatalog()})
         for (const auto &entry : catalog)
             result.append(entry);
     for (const auto &entry : McpState::toolCatalog())
@@ -408,6 +410,7 @@ bool KdenliveMcpServer::start(const QString &socketName, QString *error)
     if (!QRegularExpression(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]{7,99}$")).match(socketName).hasMatch())
         reason = QStringLiteral("Use an explicit unique socket name, 8-100 letters, digits, dots, underscores or hyphens.");
     if (reason.isEmpty() && !m_server.listen(socketName)) reason = m_server.errorString();
+    if (reason.isEmpty()) qInfo().noquote() << "Kdenlive MCP endpoint:" << m_server.fullServerName();
     if (error) *error = reason;
     return reason.isEmpty();
 }
@@ -664,7 +667,10 @@ QJsonObject KdenliveMcpServer::callTool(const QString &name, const QJsonObject &
             {{QStringLiteral("ok"), true},
              {QStringLiteral("application"), QStringLiteral("Kdenlive")},
              {QStringLiteral("version"), QStringLiteral(KDENLIVE_VERSION)},
+             {QStringLiteral("buildVersion"), QStringLiteral(KDENLIVE_FULL_VERSION_STRING)},
              {QStringLiteral("prototypeVersion"), QStringLiteral("0.4.0")},
+             {QStringLiteral("socketName"), m_server.serverName()},
+             {QStringLiteral("endpoint"), m_server.fullServerName()},
              {QStringLiteral("sessionId"), m_sessionId},
              {QStringLiteral("processId"), QString::number(QCoreApplication::applicationPid())},
              {QStringLiteral("scope"),
@@ -697,7 +703,9 @@ QJsonObject KdenliveMcpServer::callTool(const QString &name, const QJsonObject &
     if (readOnly) {
         const auto statePage = McpState::callTool(this, name, arguments, state, [this] { return snapshot(); });
         if (!statePage.isEmpty()) return statePage;
-        auto result = McpTitles::callTool(this, name, arguments, state, [this] { return snapshot(); });
+        auto result = McpProjectExtras::callTool(this, name, arguments, state, [this] { return snapshot(); });
+        if (!result.isEmpty()) return result;
+        result = McpTitles::callTool(this, name, arguments, state, [this] { return snapshot(); });
         if (!result.isEmpty()) return result;
         result = McpMarkers::callTool(this, name, arguments, state, [this] { return snapshot(); });
         if (!result.isEmpty()) return result;
@@ -727,7 +735,9 @@ QJsonObject KdenliveMcpServer::callTool(const QString &name, const QJsonObject &
     if (QApplication::activeModalWidget() || QApplication::activePopupWidget() || McpQuick::modalPopupActive(this) ||
         QApplication::mouseButtons() != Qt::NoButton)
         return failure(QStringLiteral("UI_BUSY"), QStringLiteral("Finish dragging or inspect get_ui to respond to the active dialog."), state);
-    auto moduleResult = McpTitles::callTool(this, name, arguments, state, [this] { return snapshot(); });
+    auto moduleResult = McpProjectExtras::callTool(this, name, arguments, state, [this] { return snapshot(); });
+    if (!moduleResult.isEmpty()) return moduleResult;
+    moduleResult = McpTitles::callTool(this, name, arguments, state, [this] { return snapshot(); });
     if (!moduleResult.isEmpty()) return moduleResult;
     moduleResult = McpMarkers::callTool(this, name, arguments, state, [this] { return snapshot(); });
     if (!moduleResult.isEmpty()) return moduleResult;

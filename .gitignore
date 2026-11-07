@@ -23,3 +23,7 @@ compile_commands.json
 
 # Artefacts from running KDE CI locally
 kde-ci-reports/*
+
+# Generated Python caches are not source or build provenance inputs.
+__pycache__/
+*.py[cod]

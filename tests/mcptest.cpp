@@ -1201,3 +1201,5 @@ TEST_CASE("MCP effect controls reject invalid values and incompatible targets wi
 #include "mcpnative_category_cases.inc"
 
 #include "mcp_roto_validation_cases.inc"
+
+#include "mcpadvancedediting_native_cases.inc"

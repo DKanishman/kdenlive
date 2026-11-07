@@ -11,6 +11,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "audioEnvelope.h"
 #include "definitions.h"
 #include <QList>
+#include <QSet>
 
 /**
   This class does the correlation between two tracks
@@ -48,6 +49,7 @@ public:
       This object will take ownership of the passed envelope.
       */
     void addChild(AudioEnvelope *envelope);
+    void cancel();
 
     const AudioCorrelationInfo *info(int childIndex) const;
     int getShift(int childIndex) const;
@@ -63,6 +65,8 @@ private:
 
     QList<AudioEnvelope *> m_children;
     QList<AudioCorrelationInfo *> m_correlations;
+    QSet<AudioEnvelope *> m_processed;
+    bool m_cancelled{false};
 
 private Q_SLOTS:
     /**
@@ -77,5 +81,7 @@ private Q_SLOTS:
 
 Q_SIGNALS:
     void gotAudioAlignData(int, int);
+    void alignmentFailed(int clipId, const QString &reason);
+    void alignmentCancelled(int clipId);
     void displayMessage(const QString &, MessageType, int);
 };

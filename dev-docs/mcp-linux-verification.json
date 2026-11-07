@@ -1,0 +1,122 @@
+{
+  "date": "2026-11-07",
+  "branch": "codex/mcp-linux-completion",
+  "baseRevision": "e0e5882269f66125e226bbed236d83e0f55a86b1",
+  "status": "editor_incremental_build_running_reviewed_local_access_verified",
+  "python": "3.15.0 (system interpreter); 3.15.2 also installed",
+  "selectedPythonTests": {
+    "run": 36,
+    "passed": 35,
+    "skipped": 1,
+    "skipReason": "Real Windows pipe test requires Windows",
+    "command": "python3 -B -m unittest test_kdenlive_mcp_proxy.ProxyTests test_kdenlive_mcp_proxy.WindowsPipeTests test_kdenlive_mcp_proxy.UnixSocketTests.test_peer_user_is_checked_before_any_write test_kdenlive_mcp_proxy.UnixSocketTests.test_failed_connection_closes_descriptor test_mcp_linux -q",
+    "workingDirectory": "tests"
+  },
+  "realUnixSocketTest": {
+    "status": "passed_with_reviewed_execution",
+    "includedInFullSuite": true,
+    "ordinaryExecution": "AF_UNIX binding remains restricted; use the approved execution path.",
+    "scope": "Real local Unix socket and loopback TCP roundtrips passed. The native editor endpoint is not present until the application is built/launched."
+  },
+  "nativeBuild": {
+    "status": "editor_incremental_build_running",
+    "missingCommands": [],
+    "editorDevelopmentDependenciesInstalled": true,
+    "observedVersions": {
+      "GCC": "16.2.1",
+      "CMake": "4.3.0",
+      "Qt": "6.11.2",
+      "KF": "6.31.0",
+      "systemMLT": "7.40.0"
+    },
+    "minimumMLT": "7.42.0",
+    "patchedMLTTarget": "7.43.0",
+    "observedError": "QJsonObject cbegin/cend build errors corrected to constBegin/constEnd in profile code and lifecycle test helper.",
+    "mltSourceDownloadError": null,
+    "nativeChangesCompiled": false,
+    "mltSourceRevision": "eca4e32d28e2c588a9c3b7c23e2276d9cd1f4edb",
+    "originalFourPatchesApplied": true,
+    "additionalDependencyPackagesInstalledByUser": [
+      "lilv-devel",
+      "pango-devel"
+    ],
+    "testUtility": "Isolated Kwalify 0.7.2 with Ruby 4 scanner compatibility and native line-aware YAML parser; version/schema smoke passed.",
+    "buildExitCode": null,
+    "lastObservedBuildStep": "Targeted native executable build active; MCP test object compiled.",
+    "editorConfigureAttemptedThisSession": false,
+    "manifestPresent": false,
+    "editorConfigured": true,
+    "registeredPatches": 6,
+    "mltCurrentVerification": {
+      "nativeTests": {
+        "run": 21,
+        "passed": 21,
+        "log": "build-mcp-linux/verification-logs/mlt-native-current.log"
+      },
+      "schemaAndRuntimeQueryTests": {
+        "run": 201,
+        "passed": 201,
+        "log": "build-mcp-linux/verification-logs/mlt-schema-current.log"
+      },
+      "runtimeComponentsPresent": true,
+      "latestCombinedCtest": {
+        "run": 222,
+        "passed": 222,
+        "failed": 0,
+        "durationSeconds": 243.07
+      }
+    },
+    "editorBuildLog": "build-mcp-linux/editor-build/.ninja_log",
+    "maskRegistryFix": {
+      "implemented": true,
+      "nativeRegression": "bintest: Mask removal preserves exact named entries and their persisted registry",
+      "executed": false
+    }
+  },
+  "gitRemoteProbe": {
+    "status": "passed",
+    "command": "git ls-remote https://github.com/mltframework/mlt.git HEAD",
+    "observedHead": "0be8e814e2a4fc07e28097840963671d3668ce31"
+  },
+  "linuxInstallationCompleted": false,
+  "liveEditorVerified": false,
+  "fullEditorCoverageVerified": false,
+  "wipBranchIntegrated": false,
+  "stoppedOnUserRequest": false,
+  "lastExecutedFullPythonSuite": {
+    "command": "/usr/bin/python3 -B -m unittest discover -s tests -p 'test_*mcp*.py' -q",
+    "execution": "reviewed local execution",
+    "run": 41,
+    "passed": 40,
+    "skipped": 1,
+    "failed": 0,
+    "skipReason": "Real Windows pipe test requires Windows"
+  },
+  "pendingWorkingTree": {
+    "buildHelper": "Portable Linux setup tests pass (12). Launch identity now survives staging/commit changes without accepting changed source. Native data is staged before editor tests.",
+    "advancedEditingPrimitives": "Audio correlation/envelope sources compile in resumed editor build; native behavior cases not yet executed.",
+    "projectExtras": "Notes/non-destructive cleanup module registered in server/CMake, with three native test cases; editor compilation and execution pending.",
+    "rotoscoping": "Fifth patch and native regression registered; Native:rotoscoping passes in current 21-test native MLT run.",
+    "wipBranch": "Selectively copied/revised primitives only; branch not merged.",
+    "mltMetadata": "Sixth patch registered; all 201 MLT schema/runtime-query validations pass."
+  },
+  "initialChangesBackup": "/home/dk/.codex/work/kdenlive-mcp-linux-completion/initial-changes.tar",
+  "resumeOrder": [
+    "Finish the current incremental editor build and resolve compiler/test failures.",
+    "Run the eight native editor suites and the two Python suites with reviewed local IPC access.",
+    "Install the matched editor/runtime; launch an isolated native GUI and verify real MCP lifecycle/edit/undo/save/reopen/render workflows.",
+    "Finish the remaining editor-wide feature contracts and native audiovisual/persistence evidence.",
+    "Maintain tested checkpoints on the GitHub MCP Linux branch; install an on-demand local launcher and MCP client configuration."
+  ],
+  "currentResume": {
+    "recordedAtUtc": "2026-11-07T11:43:27.671753+00:00",
+    "sourceBranch": "codex/mcp-linux-completion",
+    "editorBuild": "targeted native app/test build running with one compiler job",
+    "liveEditorVerified": false,
+    "localTransport": "reviewed execution verified; ordinary execution remains restricted",
+    "sourceBackup": "/home/dk/.codex/work/kdenlive-mcp-native-completion/starting-changes-20261107T111922Z.tar",
+    "githubRepository": "DKanishman/kdenlive",
+    "githubBranch": "codex/mcp-linux-completion",
+    "githubCheckpointPublished": false
+  }
+}

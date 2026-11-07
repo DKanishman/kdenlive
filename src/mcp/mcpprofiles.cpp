@@ -134,7 +134,7 @@ bool validSpec(const QJsonObject &object, ProfileParam &profile)
                                     k("displayAspectNumerator"),
                                     k("displayAspectDenominator"),
                                     k("colorspace")};
-    for (auto it = object.cbegin(); it != object.cend(); ++it)
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it)
         if (!keys.contains(it.key())) return false;
     QString description;
     if (!boundedText(object.value(k("description")), description, 256) ||
@@ -182,7 +182,7 @@ QJsonArray toolCatalog()
                        {k("displayAspectDenominator"), integer("Positive display-aspect denominator, at most 10000.")},
                        {k("colorspace"), integer("Native colorspace code: 0, 170, 240, 470, 601, 709, 2020, 2021.")}};
     QJsonArray required;
-    for (auto it = fields.cbegin(); it != fields.cend(); ++it)
+    for (auto it = fields.constBegin(); it != fields.constEnd(); ++it)
         if (it.key() != k("bottomFieldFirst")) required.append(it.key());
     QJsonObject spec{{k("type"), k("object")},
                      {k("description"), k("Exact native profile specification; rational values are preserved.")},

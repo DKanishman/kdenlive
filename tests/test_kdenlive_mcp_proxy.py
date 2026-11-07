@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import socket
+import struct
+import sys
 import tempfile
 import threading
 import time
@@ -118,6 +120,26 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(messages[0]["error"]["code"], -32700)
         self.assertEqual(transport.writes, [wire(request("valid"))])
         self.assertEqual(len(calls), 1)
+
+    def test_nested_request_and_native_response_are_bounded(self):
+        nested = b"[" * (proxy.MAX_JSON_DEPTH + 1) + b"0" + b"]" * (proxy.MAX_JSON_DEPTH + 1)
+        incoming = b'{"jsonrpc":"2.0","id":1,"method":"ping","params":' + nested + b'}\n'
+        transport = MemoryTransport(wire(response("valid")))
+        code, messages, _, _ = self.run_bridge(incoming + wire(request("valid")), transport)
+        self.assertEqual(code, 0)
+        self.assertEqual(messages[0]["error"]["code"], -32700)
+        self.assertEqual(transport.writes, [wire(request("valid"))])
+        native = b'{"jsonrpc":"2.0","id":1,"result":' + nested + b'}\n'
+        transport = MemoryTransport(native)
+        code, messages, _, _ = self.run_bridge(wire(request()) + wire(request(2)), transport)
+        self.assertEqual(code, 1)
+        self.assertEqual(messages[0]["error"]["data"]["outcome"], "uncertain")
+        self.assertEqual(transport.writes, [wire(request())])
+
+    def test_depth_scan_ignores_quoted_brackets_and_escaped_quotes(self):
+        text = ('[\\\"{}]\\\\' * (proxy.MAX_JSON_DEPTH + 1))
+        value = {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": {"text": text}}
+        self.assertEqual(proxy.load_json(wire(value)), value)
 
     def test_malformed_notification_is_silent_and_never_connects(self):
         invalid = [
@@ -409,10 +431,36 @@ class WindowsPipeTests(unittest.TestCase):
 @unittest.skipUnless(os.name == "posix" and hasattr(socket, "AF_UNIX"),
                      "Requires a Unix AF_UNIX socket")
 class UnixSocketTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Requires Linux peer credentials")
+    def test_peer_user_is_checked_before_any_write(self):
+        for uid in (os.getuid(), os.getuid() + 1):
+            with self.subTest(uid=uid):
+                connection = mock.Mock()
+                connection.getsockopt.return_value = struct.pack("3i", 123, uid, 456)
+                with mock.patch.object(proxy.socket, "socket", return_value=connection):
+                    if uid == os.getuid():
+                        transport = proxy.connect_local("/tmp/kdenlive-mcp-test", 1)
+                        self.assertIs(transport.connection, connection)
+                        transport.close()
+                    else:
+                        with self.assertRaises(PermissionError):
+                            proxy.connect_local("/tmp/kdenlive-mcp-test", 1)
+                        connection.close.assert_called_once()
+                connection.sendall.assert_not_called()
+
+    def test_failed_connection_closes_descriptor(self):
+        connection = mock.Mock()
+        connection.connect.side_effect = FileNotFoundError("No editor socket")
+        with mock.patch.object(proxy.socket, "socket", return_value=connection):
+            with self.assertRaises(FileNotFoundError):
+                proxy.connect_local("/tmp/kdenlive-mcp-test", 1)
+        connection.close.assert_called_once()
+
     def test_real_unix_socket_roundtrip(self):
         with tempfile.TemporaryDirectory(prefix="kd-mcp-") as directory:
             path = os.path.join(directory, "socket")
             listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.addCleanup(listener.close)
             listener.bind(path)
             listener.listen(1)
             failures, received = [], []

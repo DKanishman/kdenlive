@@ -13,6 +13,9 @@ acquire these tools from a source checkout. This expansion is under validation.
 
 ## Start and connect
 
+For the Linux/Fedora build helper, matching runtime, connection configuration
+and current platform blockers, see [Native MCP on Linux](mcp-linux.md).
+
 Build/install Kdenlive and its normal dependencies. This branch supplies the
 reviewed [MLT dependency patches](../packaging/patches/README.md) for bulk
 playlist inspection, SDL device lifetime and Windows OpenFX registration. Build

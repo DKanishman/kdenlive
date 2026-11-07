@@ -23,12 +23,16 @@ import os
 import queue
 import re
 import socket
+import struct
 import sys
 import threading
 import time
 from typing import BinaryIO, Callable, Protocol, TextIO
 
 MAX_FRAME_BYTES = 1024 * 1024
+# Keep the bound explicit: Python 3.15's iterative decoder no longer rejects
+# deeply nested input through the interpreter's recursion limit.
+MAX_JSON_DEPTH = 1024
 # Reserve enough room to return a bounded local failure with the original ID.
 MAX_ID_BYTES = MAX_FRAME_BYTES - 2048
 READ_CHUNK_BYTES = 65536
@@ -52,6 +56,24 @@ class BridgeFailure(Exception):
 
 
 def load_json(data: bytes) -> object:
+    depth = 0
+    quoted = escaped = False
+    for byte in data:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif byte == 92:  # backslash
+                escaped = True
+            elif byte == 34:  # quote
+                quoted = False
+        elif byte == 34:
+            quoted = True
+        elif byte in (91, 123):  # array/object start
+            depth += 1
+            if depth > MAX_JSON_DEPTH:
+                raise ValueError("JSON nesting exceeds the local protocol limit.")
+        elif byte in (93, 125):
+            depth -= 1
     def invalid_constant(value: str) -> None:
         raise ValueError("Non-finite JSON number")
     return json.loads(data.decode("utf-8"), parse_constant=invalid_constant)
@@ -214,6 +236,14 @@ def connect_local(endpoint: str, timeout: float) -> Transport:
     try:
         connection.settimeout(timeout)
         connection.connect(endpoint)
+        if sys.platform.startswith("linux"):
+            # Filesystem permissions protect the server; also authenticate the
+            # server we connected to before forwarding any client request.
+            credentials = connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                                struct.calcsize("3i"))
+            _, uid, _ = struct.unpack("3i", credentials)
+            if uid != os.getuid():
+                raise PermissionError("Kdenlive socket belongs to a different user.")
         connection.settimeout(None)
         return SocketTransport(connection)
     except BaseException:
@@ -248,7 +278,7 @@ def native_message(frame: bytes, request_id: object) -> bool:
     """Validate output; return True for the matching response, False for notices."""
     try:
         value = load_json(frame)
-    except (ValueError, UnicodeError) as error:
+    except (ValueError, UnicodeError, RecursionError) as error:
         raise ProtocolFailure("Kdenlive returned malformed JSON.") from error
     if not isinstance(value, dict) or value.get("jsonrpc") != "2.0":
         raise ProtocolFailure("Kdenlive returned an invalid JSON-RPC object.")

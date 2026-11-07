@@ -6,13 +6,10 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 
 #include "audioEnvelope.h"
-#include "audioStreamInfo.h"
-#include "bin/bin.h"
 #include "bin/projectclip.h"
+#include "bin/projectitemmodel.h"
 #include "core.h"
 #include "kdenlive_debug.h"
-#include <KLocalizedString>
-#include <QElapsedTimer>
 #include <QImage>
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
@@ -23,38 +20,54 @@ AudioEnvelope::AudioEnvelope(const QString &binId, int clipId, std::pair<int, in
     , m_clipId(clipId)
     , m_startpos(startPos)
 {
-    std::shared_ptr<ProjectClip> clip = pCore->bin()->getBinClip(binId);
-    m_producer = clip->cloneProducer();
-    if (length > 2000) {
-        // Analyze on timeline clip zone only
-        m_offset = 0;
-        m_producer->set_in_and_out(int(offset), int(offset + length));
+    connect(&m_watcher, &QFutureWatcherBase::finished, this, [this] { Q_EMIT envelopeReady(this); });
+    const auto model = pCore ? pCore->projectItemModel() : nullptr;
+    const auto clip = model ? model->getClipByBinID(binId) : nullptr;
+    if (!clip || !clip->statusReady()) {
+        m_inputError = QStringLiteral("The audio source is missing or not ready.");
+        return;
     }
-    m_envelopeSize = size_t(m_producer->get_playtime());
-
+    auto source = clip->cloneProducer();
+    if (!source || !source->is_valid() || !clip->hasAudio()) {
+        m_inputError = QStringLiteral("The source has no decodable audio producer.");
+        return;
+    }
+    if ((stream.first == -1 && stream.second != -1) || stream.first < -1 || stream.second < -1 ||
+        (stream.first >= 0 && (!clip->audioStreams().contains(stream.first) || clip->getAudioStreamFfmpegIndex(stream.first) != stream.second))) {
+        m_inputError = QStringLiteral("The selected native audio stream does not exist or its indices disagree.");
+        return;
+    }
+    const size_t available = size_t(qMax(0, source->get_playtime()));
+    if (offset >= available || (length && length > available - offset)) {
+        m_inputError = QStringLiteral("The requested audio range is empty or exceeds the analysis frame limit.");
+        return;
+    }
+    const size_t selected = length ? length : available - offset;
+    if (selected > 1000000) {
+        m_inputError = QStringLiteral("The requested audio range exceeds the analysis frame limit.");
+        return;
+    }
+    // Always analyze the exact requested source window, including short clips.
+    // A native cut maps its frame zero to the requested source-in.
+    m_producer.reset(source->cut(int(offset), int(offset + selected - 1)));
+    m_offset = 0;
+    if (!m_producer || !m_producer->is_valid()) {
+        m_inputError = QStringLiteral("The native audio source cut could not be created.");
+        return;
+    }
+    m_envelopeSize = selected;
     m_producer->set("set.test_image", 1);
     if (stream.first > -1) {
-        m_producer->set("audio_index", stream.first);
-        m_producer->set("astream", stream.second);
-    }
-    connect(&m_watcher, &QFutureWatcherBase::finished, this, [this] { Q_EMIT envelopeReady(this); });
-    if (!m_producer || !m_producer->is_valid()) {
-        qCDebug(KDENLIVE_LOG) << "// Cannot create envelope for producer: " << binId;
-    } else {
-        m_info = std::make_unique<AudioInfo>(m_producer);
+        m_producer->parent().set("audio_index", stream.first);
+        m_producer->parent().set("astream", stream.second);
     }
 }
 
 AudioEnvelope::~AudioEnvelope()
 {
-    if (hasComputationStarted()) {
-        // This is better than nothing, but does not seem enough to
-        // guarantee safe deletion of the AudioEnvelope while the
-        // computations are running: if the computations have just
-        // finished, m_watcher might be finished, but the signal
-        // 'envelopeReady' might still be pending while AudioEnvelope is
-        // being deleted, which can cause a crash according to
-        // https://doc.qt.io/qt-5/qobject.html#dtor.QObject.
+    disconnect(&m_watcher, nullptr, this, nullptr);
+    cancel();
+    if (m_started) {
         m_audioSummary.waitForFinished();
         m_watcher.waitForFinished();
     }
@@ -62,16 +75,31 @@ AudioEnvelope::~AudioEnvelope()
 
 void AudioEnvelope::startComputeEnvelope()
 {
+    if (m_started) return;
+    m_started = true;
     m_audioSummary = QtConcurrent::run(&AudioEnvelope::loadAndNormalizeEnvelope, this);
     m_watcher.setFuture(m_audioSummary);
 }
 
 bool AudioEnvelope::hasComputationStarted() const
 {
-    // An empty qFuture is canceled. QtConcurrent::run() returns a
-    // future that does not support cancellation, so this is a good way
-    // to check whether the computations have started.
-    return !m_audioSummary.isCanceled();
+    return m_started;
+}
+void AudioEnvelope::cancel()
+{
+    m_cancelled.store(true);
+}
+bool AudioEnvelope::isFinished() const
+{
+    return m_started && m_audioSummary.isFinished();
+}
+bool AudioEnvelope::wasCancelled() const
+{
+    return m_cancelled.load();
+}
+QString AudioEnvelope::error()
+{
+    return audioSummary().error;
 }
 
 const AudioEnvelope::AudioSummary &AudioEnvelope::audioSummary()
@@ -97,43 +125,60 @@ const std::vector<qint64> &AudioEnvelope::envelope()
 
 AudioEnvelope::AudioSummary AudioEnvelope::loadAndNormalizeEnvelope() const
 {
-    qCDebug(KDENLIVE_LOG) << "Loading envelope …";
-    AudioSummary summary(m_envelopeSize);
-    if (!m_info || m_info->size() < 1) {
+    AudioSummary summary;
+    if (!m_inputError.isEmpty()) {
+        summary.error = m_inputError;
         return summary;
     }
-    int samplingRate = m_info->info(0)->samplingRate();
-    mlt_audio_format format_s16 = mlt_audio_s16;
-    int channels = 1;
-
-    QElapsedTimer t;
-    t.start();
-    m_producer->seek(0);
-    size_t max = summary.audioAmplitudes.size();
-    for (size_t i = 0; i < max; ++i) {
-        std::unique_ptr<Mlt::Frame> frame(m_producer->get_frame(int(i)));
-        qint64 position = mlt_frame_get_position(frame->get_frame());
-        int samples = mlt_audio_calculate_frame_samples(float(m_producer->get_fps()), samplingRate, position);
-        auto *data = static_cast<qint16 *>(frame->get_audio(format_s16, samplingRate, channels, samples));
-
-        summary.audioAmplitudes[i] = 0;
-        for (int k = 0; k < samples; ++k) {
-            summary.audioAmplitudes[i] += abs(data[k]);
+    // MLT cuts own their range but do not inherit the parent's stream metadata.
+    // Decode the already validated source instead of probing metadata on the cut.
+    if (!m_producer || !m_producer->is_valid() || !m_envelopeSize) {
+        summary.error = QStringLiteral("The selected source has no audio analysis data.");
+        return summary;
+    }
+    summary.audioAmplitudes.resize(m_envelopeSize);
+    for (size_t i = 0; i < m_envelopeSize; ++i) {
+        if (m_cancelled.load()) {
+            summary.audioAmplitudes.clear();
+            summary.error = QStringLiteral("Audio analysis cancelled.");
+            return summary;
         }
-        pCore->displayMessage(i18n("Processing data analysis"), ProcessingJobMessage, int(100 * i / max));
+        m_producer->seek(int(i));
+        std::unique_ptr<Mlt::Frame> frame(m_producer->get_frame());
+        if (!frame || !frame->is_valid()) {
+            summary.error = QStringLiteral("Native audio frame decoding failed.");
+            break;
+        }
+        mlt_audio_format format = mlt_audio_s16;
+        int rate = 48000, channels = 1;
+        int samples = mlt_audio_calculate_frame_samples(float(m_producer->get_fps()), rate, int(i));
+        const auto *data = static_cast<const qint16 *>(frame->get_audio(format, rate, channels, samples));
+        if (!data || format != mlt_audio_s16 || rate <= 0 || samples <= 0 || samples > 384000 || channels <= 0 || channels > 64 || frame->get_int("test_audio")) {
+            summary.error = QStringLiteral("Native audio decoding returned an invalid sample buffer.");
+            break;
+        }
+        qint64 amplitude = 0;
+        for (qsizetype sample = 0; sample < qsizetype(samples) * channels; ++sample)
+            amplitude += std::abs(int(data[sample]));
+        summary.audioAmplitudes[i] = amplitude / channels;
+        if (i % 25 == 0) Q_EMIT const_cast<AudioEnvelope *>(this)->progress(int(100 * i / m_envelopeSize));
     }
-    qCDebug(KDENLIVE_LOG) << "Calculating the envelope (" << m_envelopeSize << " frames) took " << t.elapsed() << " ms.";
-    qCDebug(KDENLIVE_LOG) << "Normalizing envelope …";
-    const qint64 meanBeforeNormalization =
-        std::accumulate(summary.audioAmplitudes.begin(), summary.audioAmplitudes.end(), 0LL) / qint64(summary.audioAmplitudes.size());
-
-    // Normalize the envelope.
-    summary.amplitudeMax = 0;
-    for (size_t i = 0; i < max; ++i) {
-        summary.audioAmplitudes[i] -= meanBeforeNormalization;
-        summary.amplitudeMax = std::max(summary.amplitudeMax, qAbs(summary.audioAmplitudes[i]));
+    if (!summary.error.isEmpty()) {
+        summary.audioAmplitudes.clear();
+        return summary;
     }
-    pCore->displayMessage(i18n("Audio analysis finished"), OperationCompletedMessage, 300);
+    long double total = 0;
+    for (const auto value : summary.audioAmplitudes)
+        total += value;
+    const qint64 mean = qint64(total / summary.audioAmplitudes.size());
+    for (auto &value : summary.audioAmplitudes) {
+        value -= mean;
+        summary.amplitudeMax = std::max(summary.amplitudeMax, qAbs(value));
+    }
+    if (!summary.amplitudeMax) {
+        summary.error = QStringLiteral("The selected audio is silent or has no varying alignment evidence.");
+        summary.audioAmplitudes.clear();
+    }
     return summary;
 }
 

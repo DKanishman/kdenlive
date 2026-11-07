@@ -22,10 +22,19 @@ Do not copy a new dependency DLL into an editor process that is already running.
   `src/modules/xml/producer_xml.c` and a native XML regression. The missing
   declaration made 64-bit Windows treat the returned current-directory pointer
   as an integer and crash when opening an XML file through a relative path.
+- `mlt-rotoscoping-bounds.patch` replaces the fixed scanline intersection buffer
+  with checked allocation, bounds Bezier subdivision and propagates geometry
+  failures before applying a partial mask. Its native regression covers 4,096
+  intersections, coincident-anchor loops, offscreen coordinates and rejected
+  non-finite/excessive geometry through the real frame callback.
+- `mlt-metadata-validation.patch` repairs duplicate YAML keys in three pinned
+  module descriptions and a missing folded-scalar marker in RGBLUT metadata.
+  The source-schema and runtime-query validation suites check these files.
 
 Apply each patch from the MLT source root with `git apply --check <patch>` and
-then `git apply <patch>`. The patches affect separate files and can be applied in
-any order. They are deliberately not applied automatically by Kdenlive's build.
+then `git apply <patch>`. Apply the documented sequence; test registration files
+can be shared by patches. They are not applied automatically by Kdenlive's build;
+the Linux helper explicitly checks and applies this complete list.
 Record the exact dependency source revision and preserve its local changes.
 
 Build MLT with its normal CMake workflow and platform dependencies. Enable

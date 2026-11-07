@@ -27,6 +27,7 @@ set(KdenliveTest_SOURCES
     mixtest.cpp
     modeltest.cpp
     mcptest.cpp
+    mcpprojectextrastest.cpp
     movetest.cpp
     nestingtest.cpp
     projectpathstest.cpp
@@ -75,4 +76,6 @@ find_package(Python3 3.10 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
   add_test(NAME mcp_proxy COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/test_kdenlive_mcp_proxy.py" -q)
   set_tests_properties(mcp_proxy PROPERTIES TIMEOUT 30)
+  add_test(NAME mcp_linux COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/test_mcp_linux.py" -q)
+  set_tests_properties(mcp_linux PROPERTIES TIMEOUT 30)
 endif()

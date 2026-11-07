@@ -1,0 +1,400 @@
+diff --git a/src/modules/plusgpl/filter_rotoscoping.c b/src/modules/plusgpl/filter_rotoscoping.c
+index 782c3942..2e079027 100644
+--- a/src/modules/plusgpl/filter_rotoscoping.c
++++ b/src/modules/plusgpl/filter_rotoscoping.c
+@@ -25,6 +25,7 @@
+ #include "cJSON.h"
+ 
+ #include <math.h>
++#include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -82,14 +83,16 @@ static inline void lerp(const PointF *a, const PointF *b, PointF *result, double
+  * Speed gain? */
+ static inline void lerpHalf(const PointF *a, const PointF *b, PointF *result)
+ {
+-    result->x = (a->x + b->x) * .5;
+-    result->y = (a->y + b->y) * .5;
++    result->x = a->x * .5 + b->x * .5;
++    result->y = a->y * .5 + b->y * .5;
+ }
+ 
+ /** Helper for using qsort with an array of integers. */
+ int ncompare(const void *a, const void *b)
+ {
+-    return *(const int *) a - *(const int *) b;
++    const int left = *(const int *) a;
++    const int right = *(const int *) b;
++    return (left > right) - (left < right);
+ }
+ 
+ /** Turns a json array with two children into a point (x, y tuple). */
+@@ -221,9 +224,15 @@ static void blur(uint8_t *map, int width, int height, int radius, int passes)
+  * \param map array of integers of the dimension width * height.
+  *            The map entries belonging to the points in the polygon will be set to \param set * 255 the others to !set * 255.
+  */
+-static void fillMap(PointF *vertices, int count, int width, int height, int invert, uint8_t *map)
++static int fillMap(PointF *vertices, int count, int width, int height, int invert, uint8_t *map)
+ {
+-    int nodes, nodeX[1024], pixelY, i, j, value;
++    int nodes, pixelY, i, j, value;
++    if (count < 0 || count > INT_MAX / (int) sizeof(int) || width <= 0 || height <= 0
++        || width > INT_MAX / height)
++        return 1;
++    int *nodeX = count ? malloc((size_t) count * sizeof(int)) : NULL;
++    if (count && !nodeX)
++        return 1;
+ 
+     value = !invert * 255;
+     memset(map, invert * 255, width * height);
+@@ -236,16 +245,28 @@ static void fillMap(PointF *vertices, int count, int width, int height, int inve
+          * and therefore indicate a move from in to out or vice versa
+          */
+         nodes = 0;
+-        for (i = 0, j = count - 1; i < count; j = i++)
+-            if ((vertices[i].y > (double) pixelY) != (vertices[j].y > (double) pixelY))
+-                nodeX[nodes++] = (int) (vertices[i].x
+-                                        + (pixelY - vertices[i].y) / (vertices[j].y - vertices[i].y)
+-                                              * (vertices[j].x - vertices[i].x));
++        for (i = 0, j = count - 1; i < count; j = i++) {
++            if (!isfinite(vertices[i].x) || !isfinite(vertices[i].y)) {
++                free(nodeX);
++                return 1;
++            }
++            if ((vertices[i].y > (double) pixelY) != (vertices[j].y > (double) pixelY)) {
++                const double t = (pixelY - vertices[i].y) / (vertices[j].y - vertices[i].y);
++                const double x = vertices[i].x * (1 - t) + vertices[j].x * t;
++                if (!isfinite(x)) {
++                    free(nodeX);
++                    return 1;
++                }
++                // Clip before narrowing: offscreen native coordinates can
++                // exceed the range of an int without affecting the fill.
++                nodeX[nodes++] = x <= 0 ? 0 : x >= width ? width : (int) x;
++            }
++        }
+ 
+         qsort(nodeX, nodes, sizeof(int), ncompare);
+ 
+         // Set map values for points between the node pairs to 1
+-        for (i = 0; i < nodes; i += 2) {
++        for (i = 0; i + 1 < nodes; i += 2) {
+             if (nodeX[i] >= width)
+                 break;
+ 
+@@ -256,6 +277,8 @@ static void fillMap(PointF *vertices, int count, int width, int height, int inve
+             }
+         }
+     }
++    free(nodeX);
++    return 0;
+ }
+ 
+ /** Determines the point in the middle of the Bézier curve (t = 0.5) defined by \param p1 and \param p2
+@@ -277,34 +300,57 @@ static void deCasteljau(BPointF *p1, BPointF *p2, BPointF *mid)
+ }
+ 
+ /**
+- * Calculates points for the cubic Bézier curve defined by \param p1 and \param p2.
+- * Points are calculated until the squared distanced between neighbour points is smaller than 2.
++ * Calculates a bounded polygon for the cubic Bézier curve. Test the whole
++ * control polygon, not only the chord: coincident anchors can enclose a loop.
++ * Each leaf emits its first anchor; the following curve supplies its endpoint.
+  * \param points Pointer to list of points. Will be allocated and filled with calculated points.
+  * \param count Number of calculated points in \param points
+  * \param size Allocated size of \param points (in elements not in bytes)
+  */
+-static void curvePoints(BPointF p1, BPointF p2, PointF **points, int *count, int *size)
+-{
+-    double errorSqr = SQR(p1.p.x - p2.p.x) + SQR(p1.p.y - p2.p.y);
++#define ROTO_MAX_VERTICES (1024 * 1024)
++#define ROTO_MAX_DEPTH 32
+ 
+-    if (*count + 1 >= *size) {
+-        *size += (int) sqrt(errorSqr / 2) + 1;
+-        *points = mlt_pool_realloc(*points, *size * sizeof(struct PointF));
++static int appendPoint(PointF point, PointF **points, int *count, int *size)
++{
++    if (*count >= ROTO_MAX_VERTICES)
++        return 1;
++    if (*count == *size) {
++        const int capacity = *size ? MIN(*size * 2, ROTO_MAX_VERTICES) : 256;
++        PointF *grown = realloc(*points, (size_t) capacity * sizeof(PointF));
++        if (!grown)
++            return 1;
++        *points = grown;
++        *size = capacity;
+     }
++    (*points)[(*count)++] = point;
++    return 0;
++}
+ 
+-    (*points)[(*count)++] = p1.p;
++static int subdivideCurve(BPointF p1, BPointF p2, PointF **points, int *count, int *size, int depth)
++{
++    const double first = SQR(p1.p.x - p1.h2.x) + SQR(p1.p.y - p1.h2.y);
++    const double middle = SQR(p1.h2.x - p2.h1.x) + SQR(p1.h2.y - p2.h1.y);
++    const double last = SQR(p2.h1.x - p2.p.x) + SQR(p2.h1.y - p2.p.y);
+ 
+-    if (errorSqr <= 2)
+-        return;
++    if (first <= 2 && middle <= 2 && last <= 2)
++        return appendPoint(p1.p, points, count, size);
++    if (depth >= ROTO_MAX_DEPTH)
++        return 1;
+ 
+     BPointF mid;
+     deCasteljau(&p1, &p2, &mid);
++    if (subdivideCurve(p1, mid, points, count, size, depth + 1))
++        return 1;
++    return subdivideCurve(mid, p2, points, count, size, depth + 1);
++}
+ 
+-    curvePoints(p1, mid, points, count, size);
+-
+-    curvePoints(mid, p2, points, count, size);
+-
+-    (*points)[*(count)++] = p2.p;
++static int curvePoints(BPointF p1, BPointF p2, PointF **points, int *count, int *size)
++{
++    const PointF controls[] = {p1.p, p1.h2, p2.h1, p2.p};
++    for (int i = 0; i < 4; i++)
++        if (!isfinite(controls[i].x) || !isfinite(controls[i].y))
++            return 1;
++    return subdivideCurve(p1, p2, points, count, size, 0);
+ }
+ 
+ /** Do it :-).
+@@ -383,18 +429,29 @@ static int filter_get_image(mlt_frame frame,
+         }
+ 
+         count = 0;
+-        size = 1;
+-        points = mlt_pool_alloc(size * sizeof(struct PointF));
++        size = 0;
++        points = NULL;
+         for (i = 0; i < bcount; i++) {
+             j = (i + 1) % bcount;
+-            curvePoints(bpoints[i], bpoints[j], &points, &count, &size);
++            if (curvePoints(bpoints[i], bpoints[j], &points, &count, &size)) {
++                free(points);
++                return 1;
++            }
+         }
+ 
+         if (count) {
++            if (*width <= 0 || *height <= 0 || *width > INT_MAX / *height) {
++                free(points);
++                return 1;
++            }
+             length = *width * *height;
+-            uint8_t *map = mlt_pool_alloc(length);
++            uint8_t *map = malloc(length);
+             int invert = mlt_properties_get_int(unique, "invert");
+-            fillMap(points, count, *width, *height, invert, map);
++            if (!map || fillMap(points, count, *width, *height, invert, map)) {
++                free(map);
++                free(points);
++                return 1;
++            }
+ 
+             int feather = mlt_properties_get_int(unique, "feather");
+             if (feather && mode != MODE_RGB) {
+@@ -518,10 +575,10 @@ static int filter_get_image(mlt_frame frame,
+                 break;
+             }
+ 
+-            mlt_pool_release(map);
++            free(map);
+         }
+ 
+-        mlt_pool_release(points);
++        free(points);
+     }
+ 
+     return error;
+diff --git a/src/tests/CMakeLists.txt b/src/tests/CMakeLists.txt
+index 22ab36b5..7a7633f3 100644
+--- a/src/tests/CMakeLists.txt
++++ b/src/tests/CMakeLists.txt
+@@ -48,6 +48,22 @@ add_qt_test(TEST_NAME service)
+ add_qt_test(TEST_NAME tractor)
+ add_qt_test(TEST_NAME xml)
+ 
++if(MOD_PLUSGPL)
++  # Include the private rasterizer in a C regression executable so bounds and
++  # allocation/depth failures are checked independently of plugin discovery.
++  add_executable(test_rotoscoping
++    test_rotoscoping/test_rotoscoping.c
++    ../modules/plusgpl/cJSON.c
++  )
++  target_compile_options(test_rotoscoping PRIVATE ${MLT_COMPILE_OPTIONS})
++  target_link_libraries(test_rotoscoping PRIVATE mlt)
++  if(NOT MSVC)
++    target_link_libraries(test_rotoscoping PRIVATE m)
++  endif()
++  add_test(NAME "Native:rotoscoping" COMMAND test_rotoscoping)
++  set_tests_properties("Native:rotoscoping" PROPERTIES TIMEOUT 30)
++endif()
++
+ if(MOD_AVFORMAT)
+   add_qt_test(TEST_NAME mod_avformat)
+ endif()
+diff --git a/src/tests/test_rotoscoping/test_rotoscoping.c b/src/tests/test_rotoscoping/test_rotoscoping.c
+new file mode 100644
+index 00000000..c81641ab
+--- /dev/null
++++ b/src/tests/test_rotoscoping/test_rotoscoping.c
+@@ -0,0 +1,151 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/* Private-geometry and native-frame regressions for the rotoscoping filter. */
++#include <float.h>
++#include <stdio.h>
++
++#include "../../modules/plusgpl/filter_rotoscoping.c"
++
++#define CHECK(condition) \
++    do { \
++        if (!(condition)) { \
++            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition); \
++            return 1; \
++        } \
++    } while (0)
++
++static int many_intersections(void)
++{
++    enum { count = 4096, width = 4096, height = 3 };
++    PointF *polygon = malloc(count * sizeof(PointF));
++    uint8_t *map = malloc(width * height);
++    CHECK(polygon && map);
++    for (int i = 0; i < count; i++)
++        polygon[i] = (PointF){i, i % 2 ? 2 : 0};
++    for (int invert = 0; invert < 2; invert++) {
++        CHECK(fillMap(polygon, count, width, height, invert, map) == 0);
++        // Independent even/odd oracle, preserving native integer-edge rules.
++        for (int x = 0; x < width; x++) {
++            int inside = invert;
++            for (int i = 0, j = count - 1; i < count; j = i++) {
++                if ((polygon[i].y > 1) != (polygon[j].y > 1)) {
++                    double edge = polygon[i].x
++                                  + (1 - polygon[i].y) / (polygon[j].y - polygon[i].y)
++                                        * (polygon[j].x - polygon[i].x);
++                    if ((int) edge <= x)
++                        inside = !inside;
++                }
++            }
++            CHECK(map[width + x] == inside * 255);
++        }
++    }
++    free(map);
++    free(polygon);
++    return 0;
++}
++
++static int loop_and_bounds(void)
++{
++    BPointF loop = {{16, 16}, {64, 96}, {112, 16}};
++    PointF *points = NULL;
++    int count = 0, capacity = 0;
++    uint8_t map[128 * 128];
++    CHECK(curvePoints(loop, loop, &points, &count, &capacity) == 0);
++    CHECK(count > 32 && count < ROTO_MAX_VERTICES);
++    CHECK(fillMap(points, count, 128, 128, 0, map) == 0);
++    CHECK(map[60 * 128 + 64] == 255);
++    CHECK(map[110 * 128 + 64] == 0);
++    free(points);
++
++    points = NULL;
++    count = capacity = 0;
++    BPointF huge = {{0, 0}, {0, 0}, {DBL_MAX / 4, DBL_MAX / 4}};
++    CHECK(curvePoints(huge, huge, &points, &count, &capacity) != 0);
++    CHECK(count == 0);
++    free(points);
++
++    points = NULL;
++    count = capacity = 0;
++    huge.h2.x = NAN;
++    CHECK(curvePoints(huge, huge, &points, &count, &capacity) != 0);
++    CHECK(points == NULL && count == 0);
++    count = capacity = ROTO_MAX_VERTICES;
++    CHECK(appendPoint((PointF){0, 0}, &points, &count, &capacity) != 0);
++    CHECK(points == NULL && count == ROTO_MAX_VERTICES);
++    CHECK(fillMap(NULL, 0, INT_MAX, 2, 0, map) != 0);
++    PointF offscreen[] = {{-DBL_MAX / 4, 0}, {DBL_MAX / 4, 0},
++                          {DBL_MAX / 4, 128}, {-DBL_MAX / 4, 128}};
++    CHECK(fillMap(offscreen, 4, 128, 128, 0, map) == 0);
++    CHECK(map[64 * 128 + 64] == 255);
++    return 0;
++}
++
++static int native_frame(void)
++{
++    // Exercise the production callback, including error propagation before
++    // rasterization. No installed plugin, provider or external media is needed.
++    mlt_profile profile = mlt_profile_init(NULL);
++    CHECK(profile);
++    profile->width = profile->height = 128;
++    profile->sample_aspect_num = profile->sample_aspect_den = 1;
++    mlt_filter filter = filter_rotoscoping_init(profile, mlt_service_filter_type, "rotoscoping", NULL);
++    CHECK(filter);
++    mlt_service_set_profile(MLT_FILTER_SERVICE(filter), profile);
++    mlt_properties_set(MLT_FILTER_PROPERTIES(filter), "spline",
++                       "[[[0.125,0.125],[0.5,0.75],[0.875,0.125]]]");
++    mlt_frame frame = mlt_frame_init(NULL);
++    CHECK(frame);
++    uint8_t *pixels = mlt_pool_alloc(128 * 128 * 4);
++    CHECK(pixels);
++    memset(pixels, 255, 128 * 128 * 4);
++    mlt_frame_set_image(frame, pixels, 128 * 128 * 4, mlt_pool_release);
++    mlt_properties properties = MLT_FRAME_PROPERTIES(frame);
++    mlt_properties_set_int(properties, "width", 128);
++    mlt_properties_set_int(properties, "height", 128);
++    mlt_properties_set_int(properties, "format", mlt_image_rgba);
++    mlt_frame_set_aspect_ratio(frame, 1);
++    filter_process(filter, frame);
++    mlt_image_format format = mlt_image_rgba;
++    int width = 128, height = 128;
++    CHECK(mlt_frame_get_image(frame, &pixels, &format, &width, &height, 1) == 0);
++    CHECK(format == mlt_image_rgba && width == 128 && height == 128);
++    CHECK(pixels[(60 * 128 + 64) * 4 + 3] == 255);
++    CHECK(pixels[(110 * 128 + 64) * 4 + 3] == 0);
++    mlt_frame_close(frame);
++
++    mlt_properties_set(MLT_FILTER_PROPERTIES(filter), "spline",
++                       "[[[0,0],[0,0],[1e100,1e100]]]");
++    frame = mlt_frame_init(NULL);
++    CHECK(frame);
++    pixels = mlt_pool_alloc(128 * 128 * 4);
++    CHECK(pixels);
++    memset(pixels, 255, 128 * 128 * 4);
++    mlt_frame_set_image(frame, pixels, 128 * 128 * 4, mlt_pool_release);
++    properties = MLT_FRAME_PROPERTIES(frame);
++    mlt_properties_set_int(properties, "width", 128);
++    mlt_properties_set_int(properties, "height", 128);
++    mlt_properties_set_int(properties, "format", mlt_image_rgba);
++    mlt_frame_set_aspect_ratio(frame, 1);
++    filter_process(filter, frame);
++    format = mlt_image_rgba;
++    width = height = 128;
++    // The public frame API replaces failed callbacks with a test image.
++    // Invoke the registered production callback to observe its own error and
++    // verify that it did not partially modify the original frame buffer.
++    mlt_get_image callback = mlt_frame_pop_get_image(frame);
++    CHECK(callback);
++    CHECK(callback(frame, &pixels, &format, &width, &height, 1) != 0);
++    // No partial alpha mask is applied when geometry exceeds its depth budget.
++    CHECK(pixels[(60 * 128 + 64) * 4 + 3] == 255);
++    mlt_frame_close(frame);
++    mlt_filter_close(filter);
++    mlt_profile_close(profile);
++    return 0;
++}
++
++int main(void)
++{
++    mlt_pool_init();
++    int error = many_intersections() || loop_and_bounds() || native_frame();
++    mlt_pool_close();
++    return error;
++}

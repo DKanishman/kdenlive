@@ -267,7 +267,7 @@ QJsonObject exportArgs(McpProject &project, const QString &path, const QString &
     auto args = project.expected();
     args.insert(QStringLiteral("path"), path);
     args.insert(QStringLiteral("presetName"), preset);
-    for (auto it = extra.cbegin(); it != extra.cend(); ++it)
+    for (auto it = extra.constBegin(); it != extra.constEnd(); ++it)
         args.insert(it.key(), it.value());
     return args;
 }

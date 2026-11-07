@@ -48,6 +48,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QPainter>
 #include <QProcess>
 #include <QtMath>
+#include <cmath>
+#include <limits>
 #include <timeline2/view/qml/timelinewaveform.h>
 
 #ifdef CRASH_AUTO_TEST
@@ -880,62 +882,48 @@ bool ProjectClip::hasTimecode()
     if (!m_masterProducer || !isAVClip) {
         return false;
     }
-    if (m_recStartCodePerStream.isEmpty()) {
-        int vIndex = qMax(0, getProducerIntProperty(QStringLiteral("video_index")));
-        m_recStartCodePerStream.insert(vIndex, getStartTimecode(vIndex));
-    }
-    return m_recStartCodePerStream.values().first() > 0;
+    const int vIndex = qMax(0, getProducerIntProperty(QStringLiteral("video_index")));
+    return getStartTimecode(vIndex) >= 0;
 }
 
 int ProjectClip::getStartTimecode(int streamIndex)
 {
     bool isAVClip = m_clipType == ClipType::AV || m_clipType == ClipType::Video || m_clipType == ClipType::Audio;
     if (!m_masterProducer || !isAVClip) {
-        return 0;
+        return -1;
     }
-    if (m_recStartCodePerStream.contains(streamIndex)) {
-        return m_recStartCodePerStream.value(streamIndex);
-    }
-
-    QString cacheKey = streamIndex > 0 ? QStringLiteral("kdenlive:record_start_frame_%1").arg(streamIndex) : QStringLiteral("kdenlive:record_start_frame");
-
-    int recTime = m_masterProducer->get_int(cacheKey.toUtf8().constData());
-    if (recTime > 0) {
-        // the value was cached, just use it
-        m_recStartCodePerStream.insert(streamIndex, recTime);
-        return recTime;
-    }
-    qDebug() << ":::: FETCHING CLIP TIMECODE FOR: " << m_binId;
-    recTime = getStartTCFromProperties(streamIndex);
-
-    // cache the value in a kdenlive property
-    m_masterProducer->set(cacheKey.toUtf8().constData(), recTime);
-    m_recStartCodePerStream.insert(streamIndex, recTime);
-
-    return recTime;
+    // Legacy persisted caches may contain milliseconds rather than frames.
+    // Project FPS and source metadata can also change without replacing this
+    // object, so derive project frames from the current metadata on every read.
+    return getStartTCFromProperties(streamIndex);
 }
 
 int ProjectClip::getStartTCFromProperties(int streamIndex)
 {
-    int64_t timecode_ms = m_masterProducer->get_int64("timecode");
-    if (timecode_ms > 0) {
-        return timecode_ms;
+    const double fps = pCore->getCurrentFps();
+    const auto framesFromSeconds = [fps](long double seconds) {
+        const long double frames = seconds * fps;
+        if (!std::isfinite(fps) || fps <= 0 || !std::isfinite(frames) || frames < 0 ||
+            frames > static_cast<long double>(std::numeric_limits<int>::max()) - 0.5L)
+            return -1;
+        return int(std::llround(frames));
+    };
+    if (m_masterProducer->property_exists("timecode")) {
+        bool valid = false;
+        const qint64 milliseconds = QString::fromUtf8(m_masterProducer->get("timecode")).toLongLong(&valid);
+        if (valid && milliseconds >= 0) return framesFromSeconds(static_cast<long double>(milliseconds) / 1000);
     }
 
-    int sIndex = qMax(0, streamIndex);
-
-    // Check for a "time_reference" in the metadata, which is the timecode
-    // counted in audio samples. Convert that to milliseconds.
-    // This is an audio file, so just assume it's the first source.
-    int64_t audio_samples = m_masterProducer->get_int64("meta.attr.time_reference.markup");
-
-    if (audio_samples > 0) {
+    const int sIndex = qMax(0, streamIndex);
+    // Broadcast Wave time_reference is measured in audio samples, not project
+    // frames or milliseconds. Convert once using its actual sample rate.
+    if (m_masterProducer->property_exists("meta.attr.time_reference.markup")) {
+        bool validSamples = false, validRate = false;
+        const qint64 audioSamples = QString::fromUtf8(m_masterProducer->get("meta.attr.time_reference.markup")).toLongLong(&validSamples);
         const QString sampleRateKey = QStringLiteral("meta.media.%1.codec.sample_rate").arg(sIndex);
-        int64_t sample_rate = m_masterProducer->get_int64(sampleRateKey.toUtf8().constData());
-
-        if (audio_samples > 0) {
-            return (audio_samples * 1000) / sample_rate;
-        }
+        const qint64 sampleRate = getProducerProperty(sampleRateKey).toLongLong(&validRate);
+        if (validSamples && audioSamples >= 0 && validRate && sampleRate > 0) return framesFromSeconds(static_cast<long double>(audioSamples) / sampleRate);
+        return -1;
     }
 
     const QString streamKey = QStringLiteral("meta.attr.%1.stream.timecode.markup").arg(sIndex);
@@ -3292,6 +3280,23 @@ bool ProjectClip::hasAlpha() const
     return false;
 }
 
+namespace {
+QString serializeMasks(const QVector<MaskInfo> &masks)
+{
+    QJsonArray list;
+    for (const auto &mask : masks) {
+        list.append(QJsonObject{{QStringLiteral("name"), mask.maskName},
+                                {QStringLiteral("file"), mask.maskFile},
+                                {QStringLiteral("in"), mask.in},
+                                {QStringLiteral("out"), mask.out},
+                                {QStringLiteral("includepoints"), mask.includepoints},
+                                {QStringLiteral("excludepoints"), mask.excludepoints},
+                                {QStringLiteral("boxes"), mask.boxes}});
+    }
+    return QString::fromUtf8(QJsonDocument(list).toJson());
+}
+}
+
 void ProjectClip::addMask(const ObjectId &filterOwner, MaskInfo mask, bool autoAdd)
 {
     // Check if the mask already existed in case we are editing an existing
@@ -3314,35 +3319,23 @@ void ProjectClip::addMask(const ObjectId &filterOwner, MaskInfo mask, bool autoA
             Q_EMIT pCore->displayBinMessage(i18n("Missing clip for mask"), KMessageWidget::Information);
         }
     }
-    Q_EMIT masksUpdated();
-    QJsonArray list;
-    for (auto &m : m_masks) {
-        QJsonObject currentMask;
-        currentMask.insert(QLatin1String("name"), QJsonValue(m.maskName));
-        currentMask.insert(QLatin1String("file"), QJsonValue(m.maskFile));
-        currentMask.insert(QLatin1String("in"), QJsonValue(m.in));
-        currentMask.insert(QLatin1String("out"), QJsonValue(m.out));
-        currentMask.insert(QLatin1String("includepoints"), QJsonValue(m.includepoints));
-        currentMask.insert(QLatin1String("excludepoints"), QJsonValue(m.excludepoints));
-        currentMask.insert(QLatin1String("boxes"), QJsonValue(m.boxes));
-        list.push_back(currentMask);
-    }
-    QJsonDocument json(list);
-    setProducerProperty(QStringLiteral("kdenlive:masks"), QString::fromUtf8(json.toJson()));
+    setProducerProperty(QStringLiteral("kdenlive:masks"), serializeMasks(m_masks));
     pCore->currentDoc()->setModified(true);
+    Q_EMIT masksUpdated();
 }
 
 void ProjectClip::removeMask(const QString &maskName)
 {
-    int ix = -1;
-    for (const MaskInfo &m : std::as_const(m_masks)) {
-        if (m.maskName == maskName) {
-            ix = m_masks.indexOf(m);
-            break;
-        }
+    for (int index = 0; index < m_masks.size(); ++index) {
+        if (m_masks[index].maskName != maskName) continue;
+        // MaskInfo equality compares files, which may be shared by distinct
+        // named entries in an existing registry. Remove the matched index.
+        m_masks.removeAt(index);
+        setProducerProperty(QStringLiteral("kdenlive:masks"), serializeMasks(m_masks));
+        pCore->currentDoc()->setModified(true);
+        Q_EMIT masksUpdated();
+        return;
     }
-    m_masks.remove(ix);
-    pCore->currentDoc()->setModified(true);
 }
 
 QVector<MaskInfo> ProjectClip::masks() const

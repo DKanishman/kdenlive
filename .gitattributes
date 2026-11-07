@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: CC0-1.0
+# Keep executable Python entry points usable after checkouts with core.autocrlf.
+src/mcp/kdenlive-mcp.py text eol=lf
+dev-tools/mcp-linux.py text eol=lf
+tests/test_kdenlive_mcp_proxy.py text eol=lf
+tests/test_mcp_linux.py text eol=lf
+# Unified patch context must retain the upstream whitespace it matches.
+packaging/patches/*.patch text eol=lf -whitespace

@@ -33,3 +33,75 @@ Work is paused at the user's request. Full editor-wide coverage remains the targ
 5. Verify optional prerequisites and actual results for native speech/AI masks, external Glaxnimate and online resources. Native video capture is disabled upstream; current capture coverage concerns audio voiceover. No model downloads, provider authentication or recording were performed.
 
 The initial project-extras prototype and native alignment patches remain unverified. Do not replace the integrated source with old staging snapshots. Local build logs, test media, helpers and detailed task checkpoints remain in the Codex task workspace, outside this source tree.
+
+
+## Linux resume session - 2026-11-07 (stopped by user)
+
+Networking and real Unix sockets now pass in the agent environment. The last
+executed full Python suite ran 38 tests: 37 passed, one Windows-only skip. Later
+build-helper/native edits were not retested after the stop request.
+
+Pinned MLT source downloaded and the original four patches applied. The user
+installed lilv-devel and pango-devel. MLT configured successfully with a local
+Kwalify 0.7.2 compatibility launcher. Compilation was interrupted at the user
+request (exit 130, last observed step 358/565). Kdenlive was not built/installed;
+no native suites or live editor checks completed in this session.
+
+Preserved unfinished additions: revised WIP audio-correlation/envelope/timecode
+primitives and mcptest fragment; notes/non-destructive cleanup module and test
+source (not registered); fifth MLT rotoscoping-bounds patch/native regression
+(not registered in helper). Its development changes also remain in the ignored
+MLT checkout. Review and register unfinished pieces before the next complete
+build; do not treat discovery or these source edits as full MCP coverage.
+
+The original dirty files were backed up before new edits in
+/home/dk/.codex/work/kdenlive-mcp-linux-completion/initial-changes.tar. The current
+branch and all existing changes remain in place. See mcp-linux-verification.json
+for the current evidence and resume order.
+
+
+## Current local-tools resume — 2026-11-07
+
+Local source reads/writes and command execution work. The configured project
+write root does not grant Unix IPC: the real connector suite currently has 36
+passing cases, one Windows-only skip and one EPERM failure when creating its
+AF_UNIX listener. Native endpoint/live-editor control is still unverified.
+
+The patched MLT dependency now passes all 222 checks (21 native plus 201
+schema/runtime-query checks). Project-extras registration, the rotoscoping patch
+and the metadata patch are present in the working tree. The resumed incremental
+editor build is running with one compiler job; audio alignment sources compile.
+This entry is a progress checkpoint, not build or full-coverage certification.
+Current evidence and remaining work are in `mcp-linux-verification.json`.
+
+
+## Active local MCP completion — 2026-11-07
+
+The user resumed the full goal: native local-only MCP control, a compiled
+application launchable on demand, and ongoing synchronization to the
+DKanishman/kdenlive GitHub fork. This work is active.
+
+Verified ordinary project file edits and C++/Python/Node build workflows.
+Reviewed execution passes actual GitHub cloning, Unix and loopback socket
+roundtrips, and the full updated Python suite (40 passed, one Windows-only skip).
+The patched MLT dependency passes all 222 native/schema/runtime checks. Ordinary
+command networking/IPC remains restricted; the saved GitHub-only proxy has not
+been verified as active in this chat.
+
+The native editor build continues. Corrected QJsonObject iterator compatibility
+in custom profile tools and an export test helper. Launch provenance now hashes
+effective repository content, survives staging/committing unchanged source, and
+excludes development progress notes and generated Python caches. Its regression
+checks pass. Native effect/export data is staged in the isolated prefix before
+editor tests, without depending on the stock Flatpak's private resources.
+
+A confirmed native mask-removal defect is repaired in source: unknown names
+are no-ops, exact named entries are removed even when files are shared, saved
+registry data is refreshed, and observers see the persisted state. The new
+native regression covers source-file preservation and reload of the saved
+registry. Compilation/execution of that regression is still pending.
+
+No successful native editor install or live local MCP session is claimed yet.
+The wider alignment, source-creation, interchange/library/archive, analysis,
+mask/AI/speech, persistent render queue and remaining feature contracts in
+mcp.md and the preserved WIP design inventory remain completion gates.

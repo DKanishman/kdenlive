@@ -1,0 +1,51 @@
+diff --git a/src/modules/movit/filter_movit_convert.yml b/src/modules/movit/filter_movit_convert.yml
+index 0f6e0eee..4ba590cb 100644
+--- a/src/modules/movit/filter_movit_convert.yml
++++ b/src/modules/movit/filter_movit_convert.yml
+@@ -7,7 +7,6 @@ copyright: Meltytech, LLC
+ creator: Steinar H. Gunderson
+ license: GPLv2
+ language: en
+-description: Remove pixels from the edges of the video.
+ tags:
+   - Video
+   - Hidden
+diff --git a/src/modules/plus/filter_rgblut.yml b/src/modules/plus/filter_rgblut.yml
+index 7b046c82..6aa8db0c 100644
+--- a/src/modules/plus/filter_rgblut.yml
++++ b/src/modules/plus/filter_rgblut.yml
+@@ -9,7 +9,7 @@ license: LGPLv2.1
+ language: en
+ tags:
+   - Video
+-description:
++description: >
+   Converts input strings with exactly 256 semicolon separated integer values in 
+   range 0 - 255 to look-up tables that are then used to modify R, G, B values. 
+   
+diff --git a/src/modules/plus/filter_shape.yml b/src/modules/plus/filter_shape.yml
+index e8d5ad39..7cf4eb88 100644
+--- a/src/modules/plus/filter_shape.yml
++++ b/src/modules/plus/filter_shape.yml
+@@ -39,7 +39,6 @@ parameters:
+   - identifier: softness
+     title: Softness
+     type: float
+-    mutable: yes
+     description: >
+       When using mix (threshold) how soft to make the edge around the threshold.
+       0.0 = no softness, 1.0 = too soft
+diff --git a/src/modules/rtaudio/consumer_rtaudio.yml b/src/modules/rtaudio/consumer_rtaudio.yml
+index 71e86280..8bd98d78 100644
+--- a/src/modules/rtaudio/consumer_rtaudio.yml
++++ b/src/modules/rtaudio/consumer_rtaudio.yml
+@@ -8,8 +8,7 @@ description: >
+ url: http://www.music.mcgill.ca/~gary/rtaudio/
+ version: 4
+ copyright: Meltytech, LLC
+-creator: Dan Dennedy
+-creator: Gary P. Scavone
++creator: Dan Dennedy, Gary P. Scavone
+ license: LGPLv2.1
+ language: en
+ tags:
