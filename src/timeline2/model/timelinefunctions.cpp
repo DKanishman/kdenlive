@@ -1080,7 +1080,7 @@ bool TimelineFunctions::extractZoneWithUndo(const std::shared_ptr<TimelineItemMo
     if (clipToUnGroup > -1) {
         result = timeline->requestClipUngroup(clipToUnGroup, undo, redo);
     }
-    result = breakAffectedGroups(timeline, tracks, zone, undo, redo);
+    if (!result || !breakAffectedGroups(timeline, tracks, zone, undo, redo)) return false;
     for (auto trackId : tracks) {
         if (timeline->getTrackById_const(trackId)->isLocked()) {
             continue;
@@ -1200,11 +1200,18 @@ bool TimelineFunctions::liftZone(const std::shared_ptr<TimelineItemModel> &timel
 {
     // TODO : Cut subtitle tracks
     if (!timeline->isTrack(trackId) || timeline->trackIsLocked(trackId) || zone.x() < 0 || zone.y() <= zone.x()) return false;
+    const auto cut = [&](int item, int position) {
+        // requestClipCut rolls its own transaction back on failure. Isolate it
+        // so it cannot consume the caller's preceding successful operations.
+        Fun cutUndo = [] { return true; }, cutRedo = [] { return true; };
+        if (!requestClipCut(timeline, item, position, cutUndo, cutRedo)) return false;
+        UPDATE_UNDO_REDO_NOLOCK(cutRedo, cutUndo, undo, redo);
+        return true;
+    };
     for (int boundary : {zone.x(), zone.y()}) {
         const int composition = timeline->getCompositionByPosition(trackId, boundary);
         if (composition >= 0 && timeline->getItemPosition(composition) < boundary &&
-            timeline->getItemPosition(composition) + timeline->getItemPlaytime(composition) > boundary &&
-            !TimelineFunctions::requestClipCut(timeline, composition, boundary, undo, redo))
+            timeline->getItemPosition(composition) + timeline->getItemPlaytime(composition) > boundary && !cut(composition, boundary))
             return false;
     }
     // Check if there is a clip at start point
@@ -1225,10 +1232,10 @@ bool TimelineFunctions::liftZone(const std::shared_ptr<TimelineItemModel> &timel
                 }
             }
             if (!abortCut) {
-                TimelineFunctions::requestClipCut(timeline, startClipId, zone.x(), undo, redo);
+                if (!cut(startClipId, zone.x())) return false;
             } else {
                 // Remove the clip now, so that the mix is deleted before checking items in range
-                timeline->requestClipUngroup(startClipId, undo, redo);
+                if (timeline->isInGroup(startClipId) && !timeline->requestClipUngroup(startClipId, undo, redo)) return false;
                 if (!timeline->requestItemDeletion(startClipId, undo, redo)) {
                     return false;
                 }
@@ -1252,10 +1259,10 @@ bool TimelineFunctions::liftZone(const std::shared_ptr<TimelineItemModel> &timel
                 }
             }
             if (!abortCut) {
-                TimelineFunctions::requestClipCut(timeline, endClipId, zone.y(), undo, redo);
+                if (!cut(endClipId, zone.y())) return false;
             } else {
                 // Remove the clip now, so that the mix is deleted before checking items in range
-                timeline->requestClipUngroup(endClipId, undo, redo);
+                if (timeline->isInGroup(endClipId) && !timeline->requestClipUngroup(endClipId, undo, redo)) return false;
                 if (!timeline->requestItemDeletion(endClipId, undo, redo)) {
                     return false;
                 }
@@ -1265,7 +1272,7 @@ bool TimelineFunctions::liftZone(const std::shared_ptr<TimelineItemModel> &timel
     std::unordered_set<int> clips = timeline->getItemsInRange(trackId, zone.x(), zone.y());
     for (const auto &clipId : clips) {
         if (timeline->isInGroup(clipId)) {
-            timeline->requestClipUngroup(clipId, undo, redo, true);
+            if (!timeline->requestClipUngroup(clipId, undo, redo, true)) return false;
         }
         if (!timeline->requestItemDeletion(clipId, undo, redo)) {
             return false;

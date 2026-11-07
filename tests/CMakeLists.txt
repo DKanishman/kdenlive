@@ -28,6 +28,7 @@ set(KdenliveTest_SOURCES
     modeltest.cpp
     mcptest.cpp
     mcpalignmenttest.cpp
+    mcpmulticamtest.cpp
     mcpprojectextrastest.cpp
     movetest.cpp
     nestingtest.cpp

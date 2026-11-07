@@ -48,6 +48,9 @@ private:
     QJsonObject callTimelineTool(const QString &, const QJsonObject &, const QJsonObject &);
     static QJsonArray effectToolCatalog();
     QJsonObject callEffectTool(const QString &, const QJsonObject &, const QJsonObject &);
+    static bool timelineConsistent(const std::shared_ptr<TimelineItemModel> &);
+    static QJsonArray multicamToolCatalog();
+    QJsonObject callMulticamTool(const QString &, const QJsonObject &, const QJsonObject &);
     static QJsonArray alignmentToolCatalog();
     QJsonObject callAlignmentTool(const QString &, const QJsonObject &, const QJsonObject &);
     static QJsonArray lifecycleToolCatalog();

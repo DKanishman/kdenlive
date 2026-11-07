@@ -3185,10 +3185,20 @@ void Monitor::requestSeekIfVisible(int pos)
 
 void Monitor::updateTimelineProducer()
 {
-    const QUuid sequenceUuid = pCore->currentTimelineId();
-    int position = pCore->currentDoc()->getSequenceProperty(sequenceUuid, QStringLiteral("position"), QString::number(0)).toInt();
-    QMetaObject::invokeMethod(this, "setProducer", Q_ARG(QUuid, sequenceUuid),
-                              Q_ARG(std::shared_ptr<Mlt::Producer>, pCore->window()->getCurrentTimeline()->model()->producer()), Q_ARG(int, position));
+    // Project loading processes events after closing the previous document.
+    // A pending refresh timer can fire in that gap, or before the new timeline
+    // is attached. The normal project-open path installs its producer later.
+    auto *document = pCore->currentDoc();
+    auto *window = pCore->window();
+    if (!document || document->closing || document->loading || !window) return;
+    auto *widget = window->getCurrentTimeline();
+    if (!widget) return;
+    const auto timeline = widget->model();
+    if (!timeline || timeline != pCore->projectManager()->getTimeline()) return;
+    const QUuid sequenceUuid = timeline->uuid();
+    const int position = document->getSequenceProperty(sequenceUuid, QStringLiteral("position"), QString::number(0)).toInt();
+    QMetaObject::invokeMethod(this, "setProducer", Q_ARG(QUuid, sequenceUuid), Q_ARG(std::shared_ptr<Mlt::Producer>, timeline->producer()),
+                              Q_ARG(int, position));
 }
 
 void Monitor::setProducer(const QUuid uuid, std::shared_ptr<Mlt::Producer> producer, int pos)

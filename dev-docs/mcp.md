@@ -108,6 +108,7 @@ build/test evidence or the connected executable's `tools/list`.
 | Zones | `edit_timeline_zone`, `remove_gap`, `insert_zone` | Explicit-track lift/extract/space/gap removal and exact source insert/overwrite. |
 | Groups/selection | `group_items`, `ungroup_items`, `set_selection`, `set_clips_enabled` | Explicit native IDs/group scope; selection is separate from editing. |
 | Tracks | `add_track`, `delete_track`, `move_track`, `rename_track`, `set_track_locked`, `set_track_muted` | Native layout/name/lock/output state/history. |
+| Multicamera | `multicam_cut` | Explicit angle tracks and half-open selections, protected existing audio, acknowledged group changes and one native undo command. Unsafe native mix cuts roll back; see the completion gap below. |
 | Alignment | `start_alignment_job`, `alignment_job_status`, `cancel_alignment_job`, `apply_alignment` | Bounded local audio or native timecode analysis, explicit proposals and group-preserving apply in one undo command. |
 | Speed | `set_clip_speed`, `set_time_remap_enabled`, `set_clip_time_map` | Forward/reverse speed and ramp/freeze/reverse frame maps with readback. |
 | Sequences | `list_sequences`, `create_sequence`, `switch_sequence`, `rename_sequence`, `delete_sequence` | Deletion requires `acknowledgeHistoryReset:true`, clears ALL document history and refuses active/last/referenced targets. |
@@ -305,8 +306,49 @@ preserve source ranges, effects and disabled states. A no-op creates no undo
 command. Applying more than 256 members or inspecting a timeline with more than
 20000 items is refused. The supported final range ends at frame 10000000.
 Failed native edits attempt rollback and report a rollback failure explicitly.
-Retimed source analysis, multicam editing and unequal per-member time maps are
-separate completion requirements.
+Retimed source analysis, mixed-camera edits and unequal per-member time maps
+remain separate completion requirements.
+
+## Multicamera cuts
+
+`multicam_cut` requires fresh `expectedState`, 2–16 unique native video IDs in
+`angleTrackIds`, and 1–256 sorted, nonoverlapping `selections`. Each selection is
+`{trackId,startFrame,endFrame}` with an inclusive start and exclusive end. The
+chosen angle must have enabled video throughout the range and its track video
+output must be enabled. The operation lifts the other named camera tracks in
+that range. Gaps between selections and material outside them remain in place;
+unlisted video tracks, subtitles and all existing audio are protected. It never
+chooses scratch audio or replaces the master audio automatically.
+
+Affected native groups may need to be dissolved so native boundary cuts cannot
+cut linked audio or another chosen camera. Without
+`acknowledgeGroupChanges:true`, the operation refuses before editing and reports
+all affected root/member IDs, including audio members. Acknowledgement covers
+those groups' links, including links outside the selected ranges. Group changes
+and all lifts share one undo command. A no-op adds no history. Retained native
+fragments can have new clip IDs; inspect returned/fresh state after editing.
+Finite media retains exact source-frame ranges. Native endless generators
+(such as color clips) follow Kdenlive's resize semantics: a resized fragment
+starts at source frame zero while retaining its requested timeline range.
+
+Preflight checks ranges, coverage, required track locks and bounded work. The
+operation verifies native retained ranges and protected payloads before it
+publishes an undo command. It supports at most 2048 affected original items,
+4096 native lifts and 8192 resulting camera fragments in a timeline of at most
+20000 items; camera material must fit frame 0 through the exclusive bound
+10000000. Track locks are required only for camera tracks that actually need a
+lift. A locked chosen track can remain untouched.
+Native consistency checks include the live ruler zone, guides and source-marker
+snap points, alongside the timeline's item boundaries.
+
+**Completion gap:** native single-clip cuts through an existing same-track mix
+can alter material beyond the requested window. Such an edit currently fails
+its postcondition and returns `NATIVE_EDIT_FAILED` after complete rollback.
+Preserving both retained mix portions is still required for full multicamera
+coverage. A real regression verifies that a failed mixed-camera cut restores
+native grouping, mix settings, every decoded output frame and bit-identical
+scratch/master audio. `ROLLBACK_FAILED` is reported separately if restoration
+cannot be proven; inspect state/history in that case.
 
 ## Remaining coverage requirements
 
@@ -319,7 +361,7 @@ There are substantive implementation gaps beyond checks not yet executed:
   duration/type restrictions.
 - The render dependency queue is session-local; persistence across application
   restart and the complete multichannel/container matrix remain unfinished.
-- Rich title formatting, specialized analysis, multicam,
+- Rich title formatting, specialized analysis, full mixed-camera cuts,
   interchange/archive, capture, external animation and online resources are partly
   or wholly interactive routes. Installed speech prerequisites remain separate.
 - The supplied SDL lifetime repair passes isolated device/refcount regressions

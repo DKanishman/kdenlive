@@ -1224,7 +1224,7 @@ QJsonObject KdenliveMcpServer::callEffectTool(const QString &name, const QJsonOb
                 !applyParameters(timeline->getCompositionParameterModel(id), arguments.value(QStringLiteral("parameters")).toObject(), undo, redo, reason))
                 return failedTransaction(undo, QStringLiteral("Composition parameters failed: ") + reason);
         }
-        if (!timeline->checkConsistency()) return failedTransaction(undo, QStringLiteral("Native composition consistency check failed."));
+        if (!timelineConsistent(timeline)) return failedTransaction(undo, QStringLiteral("Native composition consistency check failed."));
         pCore->pushUndo(undo, redo, QStringLiteral("MCP edit composition"));
         auto data = compositions();
         data.insert(QStringLiteral("compositionId"), id);
@@ -1280,7 +1280,7 @@ QJsonObject KdenliveMcpServer::callEffectTool(const QString &name, const QJsonOb
                 !applyParameters(track->mixModel(second), arguments.value(QStringLiteral("parameters")).toObject(), undo, redo, reason))
                 return failedTransaction(undo, QStringLiteral("Mix parameters failed: ") + reason);
         }
-        if (!timeline->checkConsistency()) return failedTransaction(undo, QStringLiteral("Native mix consistency check failed."));
+        if (!timelineConsistent(timeline)) return failedTransaction(undo, QStringLiteral("Native mix consistency check failed."));
         pCore->pushUndo(undo, redo, QStringLiteral("MCP edit clip mix"));
         return finish(compositions());
     }

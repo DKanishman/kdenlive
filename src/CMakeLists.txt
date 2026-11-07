@@ -98,6 +98,8 @@ list(APPEND kdenlive_SRCS
     mcp/mcpsequence.h
     mcp/mcpstate.cpp
     mcp/mcpstate.h
+    mcp/mcpnativechecks.cpp
+    mcp/mcpmulticam.cpp
     mcp/mcpalignment.cpp
     mcp/mcpaudiomatch.h
     mcp/mcpprojectextras.cpp
