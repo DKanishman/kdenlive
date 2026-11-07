@@ -1,7 +1,7 @@
 {
   "date": "2026-11-07",
   "branch": "codex/mcp-linux-completion",
-  "baseRevision": "da3e09768f5a5d275d74e4d79fee6011968a1300",
+  "baseRevision": "bdbdf3982aa89ccae247854f10919a277d1c7e9b",
   "status": "installed_native_editor_and_local_mcp_verified",
   "python": "3.15.0 (system interpreter); 3.15.2 also installed",
   "selectedPythonTests": {
@@ -42,7 +42,7 @@
     ],
     "testUtility": "Isolated Kwalify 0.7.2 with Ruby 4 scanner compatibility and native line-aware YAML parser; version/schema smoke passed.",
     "buildExitCode": 0,
-    "lastObservedBuildStep": "App and MCP rebuilt; all native suites linked; complete post-fix dependency/editor validation running",
+    "lastObservedBuildStep": "Twelve suites passed; exact tested editor installed and live local MCP alignment/save/reopen/render verified.",
     "editorConfigureAttemptedThisSession": true,
     "manifestPresent": true,
     "editorConfigured": true,
@@ -63,7 +63,7 @@
         "run": 222,
         "passed": 222,
         "failed": 0,
-        "durationSeconds": 135.77
+        "durationSeconds": 230.57
       }
     },
     "editorBuildLog": "build-mcp-linux/editor-build/.ninja_log",
@@ -78,12 +78,18 @@
       "failed": 0
     },
     "finalEditorSuites": {
-      "run": 11,
-      "passed": 11,
+      "run": 12,
+      "passed": 12,
       "failed": 0
     },
-    "executableSha256": "233833609d69826a2726f1b243e5a3e40cc05b377e37d6e0576985fe2ec7d0a6",
-    "testedSourceContentSha256": "3783144e461b7f1e38a6925acd7041ef796429a15ae2ab098acf11085db9a8ce"
+    "executableSha256": "bf988c578a18320d2b18937313b725cab43087486379a73f187a6cfa81c4e747",
+    "testedSourceContentSha256": "7afb38ec2af92380fbf289f3b53dab9fedd07b36c10a9f6ea18837492f2c3f71",
+    "alignmentSuite": {
+      "cases": 14,
+      "passed": 14,
+      "failed": 0,
+      "assertions": 3197
+    }
   },
   "gitRemoteProbe": {
     "status": "passed",
@@ -106,7 +112,7 @@
   },
   "pendingWorkingTree": {
     "buildHelper": "Linux setup tests pass; same-source provenance and private Qt runtime supported.",
-    "advancedEditingPrimitives": "Native primitive cases compile and execute in passing MCP suite; higher-level job/proposal contracts remain pending.",
+    "advancedEditingPrimitives": "Alignment job/proposal/apply contract passes native and live MCP checks; multicam and unequal member time maps remain unfinished.",
     "projectExtras": "Notes/cleanup native suite passes; live notes/save/reopen verified.",
     "rotoscoping": "Bounds, validation, chronological key/pixel/undo tests pass after private cJSON symbol isolation.",
     "wipBranch": "Selectively copied/revised primitives only; branch not merged.",
@@ -114,21 +120,21 @@
   },
   "initialChangesBackup": "/home/dk/.codex/work/kdenlive-mcp-linux-completion/initial-changes.tar",
   "resumeOrder": [
-    "Publish this tested Linux checkpoint to GitHub without changing effective source content.",
-    "Complete the remaining alignment/multicam/source-creation/interchange/library/archive/analysis/masks/AI/persistent-queue feature contracts and audiovisual/persistence evidence.",
-    "Verify optional prerequisites and full native UI workflows; maintain reproducible private runtime and GitHub checkpoints."
+    "Publish the tested alignment checkpoint while preserving the matching installed build receipt.",
+    "Complete multicam, unequal time maps and remaining source-creation/interchange/library/archive/analysis/masks/AI/persistent-queue contracts with audiovisual/persistence evidence.",
+    "Verify optional prerequisites and full native UI workflows; maintain the private runtime and GitHub checkpoints."
   ],
   "currentResume": {
-    "recordedAtUtc": "2026-11-07T13:04:00.070220+00:00",
+    "recordedAtUtc": "2026-11-07T14:20:58.710498+00:00",
     "sourceBranch": "codex/mcp-linux-completion",
-    "editorBuild": "eleven suites passed, installed and live-verified; full coverage remains false",
+    "editorBuild": "twelve suites passed, installed and live alignment verified; full coverage remains false",
     "liveEditorVerified": true,
     "localTransport": "reviewed execution verified; ordinary execution remains restricted",
     "sourceBackup": "/home/dk/.codex/work/kdenlive-mcp-native-completion/starting-changes-20261107T111922Z.tar",
     "githubRepository": "DKanishman/kdenlive",
     "githubBranch": "codex/mcp-linux-completion",
     "githubCheckpointPublished": true,
-    "githubCheckpoint": "da3e09768f5a5d275d74e4d79fee6011968a1300"
+    "githubCheckpoint": "bdbdf3982aa89ccae247854f10919a277d1c7e9b"
   },
   "liveNativeWorkflows": {
     "passed": [
@@ -146,10 +152,18 @@
       "native reopen persistence",
       "real H.264 export",
       "decoded red and blue output pixels",
-      "return to blank project"
+      "return to blank project",
+      "on-demand installed editor launch",
+      "real local MCP initialize/discovery/state/UI",
+      "exact decoded audio proposal",
+      "group-preserving one-command apply",
+      "native Save As/reopen",
+      "rendered red/blue frames and non-silent audio"
     ],
     "binary": "Installed native executable; /proc executable and loaded private MLT, avformat, PlusGPL, libavcodec and x264 paths verified",
-    "fullCoverage": false
+    "fullCoverage": false,
+    "executableSha256": "bf988c578a18320d2b18937313b725cab43087486379a73f187a6cfa81c4e747",
+    "toolCount": 126
   },
   "privateCodecRuntime": {
     "ffmpegRevision": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
@@ -189,5 +203,70 @@
     "gitGithubOrdinaryExecution": "DNS restricted",
     "gitGithubReviewedExecution": "passed; actual pinned MLT/FFmpeg/x264 source downloads succeeded",
     "futureProjectScope": "Baseline tools ready; project dependencies, credentials and MCP endpoints require verification."
+  },
+  "alignmentVerification": {
+    "implemented": true,
+    "tools": [
+      "start_alignment_job",
+      "alignment_job_status",
+      "cancel_alignment_job",
+      "apply_alignment"
+    ],
+    "nativeCases": 14,
+    "livePassed": [
+      "on-demand installed editor launch",
+      "real local MCP initialize/discovery/state/UI",
+      "exact decoded audio proposal",
+      "group-preserving one-command apply",
+      "undo/redo",
+      "native Save As/reopen",
+      "rendered red/blue frames and non-silent audio",
+      "return to blank project"
+    ],
+    "liveProposal": {
+      "clipId": 8,
+      "confidenceMargin": 0.564400287004717,
+      "correlation": 1,
+      "deltaFrames": -52,
+      "fromFrame": 100,
+      "groupRootId": 10,
+      "lagFrames": -2,
+      "overlapFrames": 38,
+      "proposedFrame": 48,
+      "requiresAcknowledgement": false,
+      "runnerUpCorrelation": 0.435599712995283
+    },
+    "renderedBluePixel": [
+      0,
+      1,
+      253
+    ],
+    "renderedRedPixel": [
+      253,
+      0,
+      0
+    ],
+    "fullEditorCoverageVerified": false
+  },
+  "developmentReadinessRecheck": {
+    "report": "/home/dk/.codex/work/kdenlive-mcp-native-completion/readiness-recheck-2vpa6_p_/result.json",
+    "atUtc": "2026-11-07T14:07:08.055803+00:00",
+    "status": "passed",
+    "checksPassed": [
+      "file create/read/edit/rename/delete",
+      "fresh C++ CMake/Ninja build and CTest",
+      "fresh Python virtual environment/pip/imports",
+      "fresh Node/npm offline test",
+      "fresh Git init/add/commit/clean",
+      "real local Unix socket client/server",
+      "read-only GitHub Git network access through reviewed execution"
+    ]
+  },
+  "gitDownloadRecheck": {
+    "atUtc": "2026-11-07T14:12:08.301999+00:00",
+    "status": "passed",
+    "revision": "eca4e32d28e2c588a9c3b7c23e2276d9cd1f4edb",
+    "scope": "Fresh HTTPS Git fetch with object verification; downloaded sources were not executed.",
+    "workspace": "/home/dk/.codex/work/kdenlive-mcp-native-completion/git-download-recheck-ril11rq1"
   }
 }

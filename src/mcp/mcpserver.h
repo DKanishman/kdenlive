@@ -48,6 +48,8 @@ private:
     QJsonObject callTimelineTool(const QString &, const QJsonObject &, const QJsonObject &);
     static QJsonArray effectToolCatalog();
     QJsonObject callEffectTool(const QString &, const QJsonObject &, const QJsonObject &);
+    static QJsonArray alignmentToolCatalog();
+    QJsonObject callAlignmentTool(const QString &, const QJsonObject &, const QJsonObject &);
     static QJsonArray lifecycleToolCatalog();
     QJsonObject callLifecycleTool(const QString &, const QJsonObject &, const QJsonObject &);
     void lifecycleCleanup();

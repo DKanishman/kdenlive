@@ -237,7 +237,7 @@ ReceiptStore *store(QObject *owner, bool create = true)
 bool isCancellation(const QString &name)
 {
     return name == wk("cancel_render") || name == wk("cancel_transcode") || name == wk("cancel_speech_job") || name == wk("cancel_effect_analysis") ||
-           name == wk("cancel_media_job");
+           name == wk("cancel_media_job") || name == wk("cancel_alignment_job");
 }
 QJsonObject receiptInfo(const ReceiptStore *receipt)
 {
@@ -433,7 +433,8 @@ QJsonObject cancellationSummary(const ReceiptStore *receipt, const QJsonObject &
     summary.insert(wk("detailsDeferred"), true);
     summary.insert(wk("detailsMeaning"), wk("The original cancellation outcome/status is preserved here. Additional readback was omitted while a prior result "
                                             "is retained; release it and inspect the owned job for current details."));
-    const QString statusTool = toolName == wk("cancel_render")            ? wk("render_status")
+    const QString statusTool = toolName == wk("cancel_alignment_job")     ? wk("alignment_job_status")
+                               : toolName == wk("cancel_render")          ? wk("render_status")
                                : toolName == wk("cancel_transcode")       ? wk("transcode_status")
                                : toolName == wk("cancel_speech_job")      ? wk("speech_job_status")
                                : toolName == wk("cancel_effect_analysis") ? wk("get_effect_analysis")

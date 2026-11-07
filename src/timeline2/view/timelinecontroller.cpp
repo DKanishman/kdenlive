@@ -44,6 +44,7 @@
 #include "transitions/transitionsrepository.hpp"
 #include "utils/thumbnailcache.hpp"
 
+#include <limits>
 #include <KColorScheme>
 #include <KGuiItem>
 #include <KMessageBox>
@@ -93,6 +94,8 @@ void TimelineController::populateActions(KActionCollection *actions)
 
 void TimelineController::prepareClose()
 {
+    m_audioCorrelator.reset();
+    m_audioRef = -1;
     // Clear root so we don't call its methods anymore
     QObject::disconnect(m_deleteConnection);
     disconnect(this, &TimelineController::selectionChanged, this, &TimelineController::handleSelectionChange);
@@ -111,6 +114,8 @@ void TimelineController::prepareClose()
 
 void TimelineController::setModel(std::shared_ptr<TimelineItemModel> model, bool previewEnabled)
 {
+    m_audioCorrelator.reset();
+    m_audioRef = -1;
     m_zone = QPoint(-1, -1);
     m_hasAudioTarget = 0;
     m_lastVideoTarget = -1;
@@ -3901,12 +3906,17 @@ bool TimelineController::splitAV()
 
 void TimelineController::setAudioRef(int clipId)
 {
+    if (!m_model) return;
     if (clipId == -1) {
         clipId = getMainSelectedClip();
         if (clipId == -1) {
             pCore->displayMessage(i18n("No clip selected"), ErrorMessage, 500);
             return;
         }
+    }
+    if (!m_model->isClip(clipId)) {
+        pCore->displayMessage(i18n("No clip selected"), ErrorMessage, 500);
+        return;
     }
     m_audioRef = clipId;
     std::shared_ptr<ClipModel> clip = m_model->getClipPtr(clipId);
@@ -3917,24 +3927,32 @@ void TimelineController::setAudioRef(int clipId)
     std::pair<int, int> audioStream = {clip->getIntProperty(QStringLiteral("audio_index")), clip->getIntProperty(QStringLiteral("astream"))};
     std::unique_ptr<AudioEnvelope> envelope(new AudioEnvelope(clip->binId(), clipId, audioStream));
     m_audioCorrelator.reset(new AudioCorrelation(std::move(envelope)));
-    connect(m_audioCorrelator.get(), &AudioCorrelation::gotAudioAlignData, this, [&](int cid, int shift) {
-        // Ensure the clip was not deleted while processing calculations
-        if (m_model->isClip(cid)) {
-            int pos = m_model->getClipPosition(m_audioRef) + shift - m_model->getClipIn(m_audioRef);
-            bool result = m_model->requestClipMove(cid, m_model->getClipTrackId(cid), pos, true, true, true);
-            if (!result) {
-                pCore->displayMessage(i18n("Cannot move clip to frame %1.", (pos + shift)), ErrorMessage, 500);
-            }
-        } else {
-            // Clip was deleted, discard audio reference
+    connect(m_audioCorrelator.get(), &AudioCorrelation::gotAudioAlignData, m_audioCorrelator.get(), [this](int cid, int shift) {
+        // Either clip can disappear while the owned audio worker is running.
+        if (!m_model || !m_model->isClip(m_audioRef)) {
             m_audioRef = -1;
+            pCore->displayMessage(i18n("The audio reference was removed before alignment finished."), InformationMessage, 500);
+            return;
+        }
+        if (!m_model->isClip(cid)) {
+            return;
+        }
+        const qint64 position = qint64(m_model->getClipPosition(m_audioRef)) + shift - m_model->getClipIn(m_audioRef);
+        if (position < 0 || position > std::numeric_limits<int>::max() ||
+            !m_model->requestClipMove(cid, m_model->getClipTrackId(cid), int(position), true, true, true)) {
+            pCore->displayMessage(i18n("Cannot move clip to frame %1.", position), ErrorMessage, 500);
         }
     });
+    connect(m_audioCorrelator.get(), &AudioCorrelation::alignmentFailed, m_audioCorrelator.get(),
+            [](int, const QString &reason) { pCore->displayMessage(i18n("Audio alignment failed: %1", reason), ErrorMessage, 500); });
+    connect(m_audioCorrelator.get(), &AudioCorrelation::alignmentCancelled, m_audioCorrelator.get(),
+            [](int) { pCore->displayMessage(i18n("Audio alignment cancelled."), InformationMessage, 500); });
     connect(m_audioCorrelator.get(), &AudioCorrelation::displayMessage, pCore.get(), &Core::displayMessage);
 }
 
 void TimelineController::alignAudio(int clipId)
 {
+    if (!m_model || !m_audioCorrelator) return;
     // find other clip
     if (clipId == -1) {
         clipId = getMainSelectedClip();
@@ -3966,6 +3984,8 @@ void TimelineController::alignAudio(int clipId)
             continue;
         }
         const QString otherBinId = otherClip->binId();
+        const auto source = pCore->projectItemModel()->getClipByBinID(otherBinId);
+        if (!source || !source->hasAudio()) continue;
         std::pair<int, int> stream = {otherClip->getIntProperty(QStringLiteral("audio_index")), otherClip->getIntProperty(QStringLiteral("astream"))};
         if (m_model->m_groups->isInGroup(cid)) {
             int parentGroup = m_model->m_groups->getRootId(cid);
@@ -3973,28 +3993,18 @@ void TimelineController::alignAudio(int clipId)
                 continue;
             }
             // Only process one clip from the group
-            std::shared_ptr<ProjectClip> clip = pCore->bin()->getBinClip(otherBinId);
-            if (clip->hasAudio()) {
-                processedGroups << parentGroup;
-            } else {
-                continue;
-            }
-        }
-        if (!pCore->bin()->getBinClip(otherBinId)->hasAudio()) {
-            // Cannot process non audi clips
-            continue;
+            processedGroups << parentGroup;
         }
         if (otherBinId == masterBinClipId) {
             // easy, same clip.
-            int newPos = m_model->getClipPosition(m_audioRef) - m_model->getClipIn(m_audioRef) + m_model->getClipIn(cid);
-            if (newPos) {
-                bool result = m_model->requestClipMove(cid, m_model->getClipTrackId(cid), newPos, true, true, true);
-                processed++;
-                if (!result) {
-                    pCore->displayMessage(i18n("Cannot move clip to frame %1.", newPos), ErrorMessage, 500);
-                }
-                continue;
+            const qint64 newPos = qint64(m_model->getClipPosition(m_audioRef)) - m_model->getClipIn(m_audioRef) + m_model->getClipIn(cid);
+            const bool result = newPos >= 0 && newPos <= std::numeric_limits<int>::max() &&
+                                m_model->requestClipMove(cid, m_model->getClipTrackId(cid), int(newPos), true, true, true);
+            processed++;
+            if (!result) {
+                pCore->displayMessage(i18n("Cannot move clip to frame %1.", newPos), ErrorMessage, 500);
             }
+            continue;
         }
         processed++;
         // Perform audio calculation

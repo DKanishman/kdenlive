@@ -85,7 +85,7 @@ also includes the configured build revision.
 ## Current verification and remaining work
 
 Branch: `codex/mcp-linux-completion`. The editor and native tests compile against private patched MLT 7.43.0. All 222
-MLT tests and all eleven selected editor/connector suites pass. The native MCP
+MLT tests and all twelve selected editor/connector suites pass. The native MCP
 suite passes all 164 cases, including the unchanged roto pixel assertions after
 the cJSON isolation repair. The full Python suite passes 40 cases with one
 Windows-only skip. A repeat with source held unchanged passed and installed the
@@ -93,10 +93,22 @@ editor with a matching build receipt.
 
 The installed app launched visibly on this laptop through an on-demand local
 connector. Its executable hash and loaded private libraries were checked through
-`/proc`. Real MCP initialize, 122-tool discovery, capabilities, project state and
+`/proc`. Real MCP initialize, 126-tool discovery, capabilities, project state and
 native UI inspection pass. Exact timeline edits, undo/redo, notes, normal Save As,
 reopen and real H.264 export pass; decoded frames are red/blue as requested.
 The app was returned to a blank project after preserving its test fixture.
+The dedicated alignment suite passes 14 cases and 3197 assertions. It exercises
+trimmed source windows, FFT/direct evidence, actual AV split groups, zero/nonzero
+BWF timecode, stale inputs, group conflicts, locks/collisions, weak-evidence
+acknowledgement, decoder cancellation, disabled-state history, native GUI reference
+lifetimes, and saved-project video pixels/PCM. A fresh installed-app MCP run
+matched a two-frame delay, applied one whole-group move with undo/redo, saved and
+reopened the native document, and exported independently decoded red/blue frames
+and audible audio. Its executable SHA-256 is
+`bf988c578a18320d2b18937313b725cab43087486379a73f187a6cfa81c4e747`.
+The dependency suite was repeated: 222/222 pass. Fresh C++/Python/Node/Git/socket
+checks and an actual pinned Git fetch pass through reviewed execution. Ordinary
+execution still restricts GitHub DNS and Unix socket binding.
 Full editor coverage remains false; tool count is not coverage evidence.
 
 The personal on-demand stdio wrapper is stored outside the source under

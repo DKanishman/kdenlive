@@ -108,6 +108,7 @@ build/test evidence or the connected executable's `tools/list`.
 | Zones | `edit_timeline_zone`, `remove_gap`, `insert_zone` | Explicit-track lift/extract/space/gap removal and exact source insert/overwrite. |
 | Groups/selection | `group_items`, `ungroup_items`, `set_selection`, `set_clips_enabled` | Explicit native IDs/group scope; selection is separate from editing. |
 | Tracks | `add_track`, `delete_track`, `move_track`, `rename_track`, `set_track_locked`, `set_track_muted` | Native layout/name/lock/output state/history. |
+| Alignment | `start_alignment_job`, `alignment_job_status`, `cancel_alignment_job`, `apply_alignment` | Bounded local audio or native timecode analysis, explicit proposals and group-preserving apply in one undo command. |
 | Speed | `set_clip_speed`, `set_time_remap_enabled`, `set_clip_time_map` | Forward/reverse speed and ramp/freeze/reverse frame maps with readback. |
 | Sequences | `list_sequences`, `create_sequence`, `switch_sequence`, `rename_sequence`, `delete_sequence` | Deletion requires `acknowledgeHistoryReset:true`, clears ALL document history and refuses active/last/referenced targets. |
 | Markers | `get_markers`, `edit_marker`, `edit_marker_category` | Paged guides/source markers, points/ranges and global categories. |
@@ -268,6 +269,45 @@ QtQuick controls/models/menus with their own context tokens. Ordinary QWidget
 inspection does not cover those surfaces. Neither interface executes arbitrary
 Qt methods or properties.
 
+## Audio and timecode alignment
+
+`start_alignment_job` captures a fresh `expectedState`, an explicit `mode`
+(`audio` or `timecode`), a `reference` and 1–16 `targets`. Each member names a
+native timeline `clipId`; audio mode also requires its actual native source
+`streamId`. `includeGroups` is required and must be true to move grouped targets.
+A reference and target cannot share a native group. Analysis creates proposals
+without changing the timeline or undo history.
+
+Audio analysis decodes the exact visible source windows to mono PCM using the
+configured local FFmpeg executable, then matches their varying envelopes. It
+accepts readable local files and unretimed windows of 8–30000 project frames,
+limits total decoded audio to 512 MiB, and gives each decoder 60 seconds.
+`maxShiftFrames` bounds the signed lag; `minimumOverlapFrames` defaults to half
+the shortest window, at least eight frames. Silent or constant audio fails.
+Proposals report overlap, correlation, the competing peak and the confidence
+margin; weak or ambiguous evidence requires `acknowledgeWeakEvidence:true` when
+applying. Those values describe matching evidence, not a guarantee of sync.
+Timecode mode uses native source-zero metadata plus each clip's source-in;
+a legitimate zero timecode is supported. Audio stream selection uses native
+source IDs, while decoder provenance separately records FFmpeg's audio ordinal.
+
+Poll `alignment_job_status` for decoder/worker completion, inputs, provenance and
+proposals. Status becomes obsolete if captured project, source or native metadata
+changes. Jobs belong to this MCP server session; one may run at a time and at
+most 32 are retained. Cancellation remains available while the UI is busy or a
+prior response receipt is pending. It becomes terminal only after owned work
+has stopped. It does not edit the timeline.
+
+`apply_alignment` requires the captured state to remain current. It checks whole
+group membership, compatible member deltas, locks, final collisions and mix
+partners before moving complete roots in one native undo command. Native moves
+preserve source ranges, effects and disabled states. A no-op creates no undo
+command. Applying more than 256 members or inspecting a timeline with more than
+20000 items is refused. The supported final range ends at frame 10000000.
+Failed native edits attempt rollback and report a rollback failure explicitly.
+Retimed source analysis, multicam editing and unequal per-member time maps are
+separate completion requirements.
+
 ## Remaining coverage requirements
 
 There are substantive implementation gaps beyond checks not yet executed:
@@ -279,7 +319,7 @@ There are substantive implementation gaps beyond checks not yet executed:
   duration/type restrictions.
 - The render dependency queue is session-local; persistence across application
   restart and the complete multichannel/container matrix remain unfinished.
-- Rich title formatting, specialized analysis, multicam/alignment,
+- Rich title formatting, specialized analysis, multicam,
   interchange/archive, capture, external animation and online resources are partly
   or wholly interactive routes. Installed speech prerequisites remain separate.
 - The supplied SDL lifetime repair passes isolated device/refcount regressions

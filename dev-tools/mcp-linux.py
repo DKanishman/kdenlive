@@ -34,7 +34,7 @@ PATCHES = (
 )
 KWALIFY_VERSION = "0.7.2"
 REQUIRED_TOOLS = ("git", "cmake", "ctest", "ninja", "cc", "c++", "pkg-config", "ffmpeg")
-SUITES = "^(mcptest|subtitlestest|groupstest|sequencetest|markertest|otiotest|ffttoolstest|bintest|mcpprojectextrastest|mcp_proxy|mcp_linux)$"
+SUITES = "^(mcpalignmenttest|mcptest|subtitlestest|groupstest|sequencetest|markertest|otiotest|ffttoolstest|bintest|mcpprojectextrastest|mcp_proxy|mcp_linux)$"
 
 
 class SetupError(Exception):

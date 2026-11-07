@@ -147,3 +147,26 @@ passed. Decoded red/blue pixels were [252,0,0] and [0,0,253]. The app was return
 to a new blank project. The desktop launcher and local-only Codex MCP entry are
 configured, preserving prior settings. Current-chat catalog refresh has not been
 verified. Full editor coverage and the broader contracts above remain unfinished.
+
+## 7 November — bounded alignment workflow verified on Linux
+
+Added explicit audio/timecode analysis jobs, proposal/status/cancel and atomic
+whole-group apply with fresh/captured state guards. Decode provenance records
+actual source audio stream IDs and FFmpeg audio ordinals; the AV fixture caught
+and corrected a global-stream/ordinal mapping error. Analysis is bounded and
+makes no timeline edits. Silence fails; ambiguous evidence needs acknowledgement.
+Apply preflights groups, locks, collisions and native mix partners, preserves
+disabled states, and records one undo command. Native GUI completion now handles
+deleted references, cancels on model close/replacement and accepts frame-zero
+same-source alignment.
+
+All 12 selected editor/connector suites pass, including 164 MCP cases and 14
+alignment cases (3197 assertions). The private MLT suite passes 222/222 again.
+The source-matched app is installed and launches on demand. Real local MCP
+verified a two-frame delay, one group move, undo/redo, native Save As/reopen and
+H.264 export; independent decoding confirms red/blue frames and audio. The editor
+was returned to a blank project. Baseline fresh C++/Python/Node/Git/socket tests
+and a pinned Git download also pass through reviewed execution. Ordinary command
+network/socket restrictions remain in force. Full editor coverage is still
+false; multicam, unequal time maps and the wider remaining contracts remain
+required. The API contract is documented in mcp.md.

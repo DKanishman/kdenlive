@@ -373,9 +373,9 @@ QJsonArray KdenliveMcpServer::toolCatalog()
             if (replacement.toObject().value(QStringLiteral("name")).toString() == name) replaced = true;
         if (!replaced) result.append(entry);
     }
-    for (const auto &catalog :
-         {timeline, effectToolCatalog(), lifecycleToolCatalog(), uiToolCatalog(), McpQuick::toolCatalog(), McpMedia::toolCatalog(), McpMonitor::toolCatalog(),
-          McpProfiles::toolCatalog(), McpSpeech::toolCatalog(), McpMarkers::toolCatalog(), McpTitles::toolCatalog(), McpProjectExtras::toolCatalog()})
+    for (const auto &catalog : {timeline, alignmentToolCatalog(), effectToolCatalog(), lifecycleToolCatalog(), uiToolCatalog(), McpQuick::toolCatalog(),
+                                McpMedia::toolCatalog(), McpMonitor::toolCatalog(), McpProfiles::toolCatalog(), McpSpeech::toolCatalog(),
+                                McpMarkers::toolCatalog(), McpTitles::toolCatalog(), McpProjectExtras::toolCatalog()})
         for (const auto &entry : catalog)
             result.append(entry);
     for (const auto &entry : McpState::toolCatalog())
@@ -687,6 +687,7 @@ QJsonObject KdenliveMcpServer::callTool(const QString &name, const QJsonObject &
             return fresh;
         });
     }
+    if (name == QLatin1String("alignment_job_status") || name == QLatin1String("cancel_alignment_job")) return callAlignmentTool(name, arguments, state);
     if (name == QLatin1String("speech_job_status") || name == QLatin1String("cancel_speech_job"))
         return McpSpeech::callTool(this, name, arguments, state, [this] { return snapshot(); });
     if (name == QLatin1String("transcode_status") || name == QLatin1String("cancel_transcode"))
@@ -735,7 +736,9 @@ QJsonObject KdenliveMcpServer::callTool(const QString &name, const QJsonObject &
     if (QApplication::activeModalWidget() || QApplication::activePopupWidget() || McpQuick::modalPopupActive(this) ||
         QApplication::mouseButtons() != Qt::NoButton)
         return failure(QStringLiteral("UI_BUSY"), QStringLiteral("Finish dragging or inspect get_ui to respond to the active dialog."), state);
-    auto moduleResult = McpProjectExtras::callTool(this, name, arguments, state, [this] { return snapshot(); });
+    auto moduleResult = callAlignmentTool(name, arguments, state);
+    if (!moduleResult.isEmpty()) return moduleResult;
+    moduleResult = McpProjectExtras::callTool(this, name, arguments, state, [this] { return snapshot(); });
     if (!moduleResult.isEmpty()) return moduleResult;
     moduleResult = McpTitles::callTool(this, name, arguments, state, [this] { return snapshot(); });
     if (!moduleResult.isEmpty()) return moduleResult;
