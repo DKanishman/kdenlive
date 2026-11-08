@@ -1,0 +1,59 @@
+{
+  "baselineCommit": "c62bb3acdabfa300c8ac2f58bb9e74fde869e98e",
+  "nativeSuitesPassed": [
+    "bintest",
+    "compositiontest",
+    "ffttoolstest",
+    "groupstest",
+    "markertest",
+    "mixtest",
+    "mcptest",
+    "mcpalignmenttest",
+    "mcpmulticamtest",
+    "mcpprojectextrastest",
+    "otiotest",
+    "sequencetest",
+    "subtitlestest",
+    "mcp_proxy",
+    "mcp_linux"
+  ],
+  "multicamNativeCases": 9,
+  "multicamNativeAssertions": 19262,
+  "installedChecks": [
+    "on-demand source-matched installed editor",
+    "local MCP discovery/state/UI",
+    "explicit group acknowledgement before edits",
+    "three-camera cuts in one native history entry",
+    "unchanged audio ranges",
+    "undo/redo",
+    "native Save As and five reopen cycles",
+    "H264 red/green/blue output and decoded audio",
+    "returned to blank project"
+  ],
+  "renderedSampleRgb": [
+    [
+      253,
+      0,
+      0
+    ],
+    [
+      3,
+      255,
+      0
+    ],
+    [
+      0,
+      1,
+      253
+    ]
+  ],
+  "renderedFrameCount": 90,
+  "executableSha256": "017c302a0c8fae0467c2859a5f2edf033610944cc266610a6c005619a71541aa",
+  "unfinishedPhaseChecks": {
+    "initialPhaseAndRenderedChecks": "passed",
+    "expandedInterlacedWipeChecks": "failed; confirmed native luma-map row overread",
+    "guardedRendererBaselineExit": -11,
+    "guardedRendererBaselineExpectedFailure": true
+  },
+  "fullEditorCoverageVerified": false
+}

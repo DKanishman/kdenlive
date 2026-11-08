@@ -1,0 +1,1167 @@
+diff --git a/NEWS b/NEWS
+index 5764ad22..ec9614fb 100644
+--- a/NEWS
++++ b/NEWS
+@@ -3,6 +3,13 @@ MLT Release Notes
+ 
+ Version 7.43.0
+ 
++Framework
++  - Added mlt_playlist_get_entries_info() to read caller-buffered ranges of cached
++    playlist entry producer/cut pointers, ranges, duration and repeat count
++    without computing each entry's playlist-relative start. The caller retains
++    normal native synchronization and accumulates starts locally. The additive
++    MLT_PLAYLIST_ENTRY_INFO_API capability macro identifies this API.
++
+ Modules
+   - Fixed the `qtext` typewriter effect delaying its start after the text is
+     edited. The animation stays anchored to the filter in-point. Subtitle cues
+diff --git a/src/framework/mlt.vers b/src/framework/mlt.vers
+index 0c46a13b..a71e4dc3 100644
+--- a/src/framework/mlt.vers
++++ b/src/framework/mlt.vers
+@@ -708,5 +708,6 @@ MLT_7.42.0 {
+ 
+ MLT_7.44.0 {
+   global:
++    mlt_playlist_get_entries_info;
+     mlt_properties_revision;
+ } MLT_7.42.0;
+diff --git a/src/framework/mlt_playlist.c b/src/framework/mlt_playlist.c
+index 967a2bde..2883d647 100644
+--- a/src/framework/mlt_playlist.c
++++ b/src/framework/mlt_playlist.c
+@@ -697,6 +697,59 @@ int mlt_playlist_get_clip_info(mlt_playlist self, mlt_playlist_clip_info *info,
+     return error;
+ }
+ 
++/** Read a range of cached playlist entries without calculating prefix starts.
++ *
++ * This performs work linear in count, not in first. It allocates no output
++ * buffers or containers, changes no reference counts, and performs no seek,
++ * frame retrieval, refresh or event operation. Parent-producer lookup uses the
++ * existing mlt_producer_cut_parent() semantics; its existing property getters
++ * can canonicalize malformed internal property values.
++ *
++ * This does not refresh cached points from edited cuts. It returns the same
++ * cached points and repeat values used by mlt_playlist_get_clip_info(). Entries
++ * whose producer has been closed by autoclose still return their cached timing
++ * and repeat values with NULL producer and cut pointers.
++ *
++ * The caller must provide room for count records and use its normal native
++ * synchronization to prevent concurrent edits, autoclose or destruction. The
++ * function does not acquire a playlist container lock or retain any producer.
++ *
++ * \public \memberof mlt_playlist_s
++ * \param self a non-NULL playlist
++ * \param first the first entry index, in the inclusive range 0..playlist count
++ * \param count the number of entries, in the range 0..playlist count-first
++ * \param[out] entries caller-owned output array; may be NULL only when count is 0
++ * \return 0 on success, or 1 for an invalid argument or unavailable entry;
++ * all output records are left untouched on error
++ */
++
++int mlt_playlist_get_entries_info(mlt_playlist self,
++                                  int first,
++                                  int count,
++                                  mlt_playlist_entry_info *entries)
++{
++    if (!self || first < 0 || count < 0 || first > self->count || count > self->count - first
++        || (count > 0 && (!entries || !self->list)))
++        return 1;
++
++    // Validate the entire range before writing the caller's first record.
++    for (int i = 0; i < count; ++i)
++        if (!self->list[first + i])
++            return 1;
++
++    for (int i = 0; i < count; ++i) {
++        const playlist_entry *entry = self->list[first + i];
++        mlt_playlist_entry_info *info = &entries[i];
++        info->producer = mlt_producer_cut_parent(entry->producer);
++        info->cut = entry->producer;
++        info->frame_in = entry->frame_in;
++        info->frame_out = entry->frame_out;
++        info->frame_count = entry->frame_count;
++        info->repeat = entry->repeat;
++    }
++    return 0;
++}
++
+ /** Get number of clips in the playlist.
+  *
+  * \public \memberof mlt_playlist_s
+diff --git a/src/framework/mlt_playlist.h b/src/framework/mlt_playlist.h
+index cfe7f862..fa226ace 100644
+--- a/src/framework/mlt_playlist.h
++++ b/src/framework/mlt_playlist.h
+@@ -44,6 +44,29 @@ typedef struct
+     int repeat;               /**< the number of times the clip is repeated */
+ } mlt_playlist_clip_info;
+ 
++#define MLT_PLAYLIST_ENTRY_INFO_API 1
++
++/** \brief Cached playlist entry information without a playlist-relative start.
++ *
++ * The producer and cut pointers are borrowed. Do not close them. They remain
++ * valid only while the playlist entry and referenced producers remain alive
++ * and unchanged. Use the application's normal synchronization to prevent
++ * concurrent playlist edits, autoclose, and producer destruction.
++ *
++ * The cached frame_count includes repeat. Sum it in a suitably wide checked
++ * local accumulator when playlist-relative starts are needed.
++ */
++typedef struct
++{
++    mlt_producer
++        producer;     /**< the producer, or parent producer of a cut; can be NULL after autoclose */
++    mlt_producer cut; /**< the entry's cut producer; can be NULL after autoclose */
++    mlt_position frame_in;    /**< the cached in point */
++    mlt_position frame_out;   /**< the cached out point */
++    mlt_position frame_count; /**< the cached duration including repeats */
++    int repeat;               /**< the cached number of repetitions */
++} mlt_playlist_entry_info;
++
+ /** Playlist Entry
+ */
+ 
+@@ -104,6 +127,10 @@ MLT_EXPORT mlt_producer mlt_playlist_current(mlt_playlist self);
+ MLT_EXPORT int mlt_playlist_get_clip_info(mlt_playlist self,
+                                           mlt_playlist_clip_info *info,
+                                           int index);
++MLT_EXPORT int mlt_playlist_get_entries_info(mlt_playlist self,
++                                             int first,
++                                             int count,
++                                             mlt_playlist_entry_info *entries);
+ MLT_EXPORT int mlt_playlist_insert(
+     mlt_playlist self, mlt_producer producer, int where, mlt_position in, mlt_position out);
+ MLT_EXPORT int mlt_playlist_remove(mlt_playlist self, int where);
+diff --git a/src/framework/mlt_transition.c b/src/framework/mlt_transition.c
+index 787cc174..58e91e95 100644
+--- a/src/framework/mlt_transition.c
++++ b/src/framework/mlt_transition.c
+@@ -25,6 +25,8 @@
+ #include "mlt_log.h"
+ #include "mlt_producer.h"
+ 
++#include <errno.h>
++#include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -240,6 +242,29 @@ mlt_position mlt_transition_get_position(mlt_transition self, mlt_frame frame)
+     return position - in;
+ }
+ 
++/* A retained mix can have shorter active bounds while keeping the original
++ * source animation. Relative offsets keep that phase intact when it is moved.
++ * Ordinary transitions and malformed optional metadata use the native path. */
++static int transition_get_progress_map(mlt_transition self, int64_t *offset, int64_t *length)
++{
++    mlt_properties properties = MLT_TRANSITION_PROPERTIES(self);
++    const char *offset_text = mlt_properties_get(properties, "kdenlive:mix_progress_offset");
++    const char *length_text = mlt_properties_get(properties, "kdenlive:mix_progress_length");
++    if (!offset_text || !length_text)
++        return 0;
++    char *end = NULL;
++    errno = 0;
++    *offset = strtoll(offset_text, &end, 10);
++    if (errno || end == offset_text || *end || *offset < 0 || *offset > INT_MAX)
++        return 0;
++    errno = 0;
++    *length = strtoll(length_text, &end, 10);
++    if (errno || end == length_text || *end || *length <= 0 || *length > INT_MAX)
++        return 0;
++    int64_t in = mlt_transition_get_in(self), out = mlt_transition_get_out(self);
++    return in >= 0 && out >= in && *offset < *length && out - in + 1 <= *length - *offset;
++}
++
+ /** Get the percent complete.
+  *
+  * \public \memberof mlt_transition_s
+@@ -250,6 +275,12 @@ mlt_position mlt_transition_get_position(mlt_transition self, mlt_frame frame)
+ 
+ double mlt_transition_get_progress(mlt_transition self, mlt_frame frame)
+ {
++    int64_t offset, length;
++    if (transition_get_progress_map(self, &offset, &length))
++        return length == 1 ? 0.5
++                           : (offset + (int64_t) mlt_frame_get_position(frame)
++                              - mlt_transition_get_in(self))
++                                 / (double) length;
+     double progress = 0;
+     mlt_position in = mlt_transition_get_in(self);
+     mlt_position out = mlt_transition_get_out(self);
+@@ -284,6 +315,9 @@ double mlt_transition_get_progress(mlt_transition self, mlt_frame frame)
+ 
+ double mlt_transition_get_progress_delta(mlt_transition self, mlt_frame frame)
+ {
++    int64_t offset, length;
++    if (transition_get_progress_map(self, &offset, &length))
++        return 0.5 / (double) length;
+     double progress = 0;
+     mlt_position in = mlt_transition_get_in(self);
+     mlt_position out = mlt_transition_get_out(self);
+diff --git a/src/modules/movit/filter_movit_convert.yml b/src/modules/movit/filter_movit_convert.yml
+index 0f6e0eee..4ba590cb 100644
+--- a/src/modules/movit/filter_movit_convert.yml
++++ b/src/modules/movit/filter_movit_convert.yml
+@@ -7,7 +7,6 @@ copyright: Meltytech, LLC
+ creator: Steinar H. Gunderson
+ license: GPLv2
+ language: en
+-description: Remove pixels from the edges of the video.
+ tags:
+   - Video
+   - Hidden
+diff --git a/src/modules/openfx/factory.c b/src/modules/openfx/factory.c
+index e4d34fd8..ca777fa6 100644
+--- a/src/modules/openfx/factory.c
++++ b/src/modules/openfx/factory.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include "mlt_openfx.h"
++#include "mltopenfx_export.h"
+ #include <glib.h>
+ #include <stdbool.h>
+ #include <stdint.h>
+@@ -362,7 +363,7 @@ static void scan_ofx_dir(mlt_repository repository, const char *dir, int *dli, i
+     closedir(d);
+ }
+ 
+-MLT_REPOSITORY
++MLTOPENFX_EXPORT MLT_REPOSITORY
+ {
+     MltOfxHost.host = (OfxPropertySetHandle) mlt_properties_new();
+     mltofx_init_host_properties(MltOfxHost.host);
+diff --git a/src/modules/plus/filter_rgblut.yml b/src/modules/plus/filter_rgblut.yml
+index 7b046c82..6aa8db0c 100644
+--- a/src/modules/plus/filter_rgblut.yml
++++ b/src/modules/plus/filter_rgblut.yml
+@@ -9,7 +9,7 @@ license: LGPLv2.1
+ language: en
+ tags:
+   - Video
+-description:
++description: >
+   Converts input strings with exactly 256 semicolon separated integer values in 
+   range 0 - 255 to look-up tables that are then used to modify R, G, B values. 
+   
+diff --git a/src/modules/plus/filter_shape.yml b/src/modules/plus/filter_shape.yml
+index e8d5ad39..7cf4eb88 100644
+--- a/src/modules/plus/filter_shape.yml
++++ b/src/modules/plus/filter_shape.yml
+@@ -39,7 +39,6 @@ parameters:
+   - identifier: softness
+     title: Softness
+     type: float
+-    mutable: yes
+     description: >
+       When using mix (threshold) how soft to make the edge around the threshold.
+       0.0 = no softness, 1.0 = too soft
+diff --git a/src/modules/plusgpl/CMakeLists.txt b/src/modules/plusgpl/CMakeLists.txt
+index e9bd982e..56e567ea 100644
+--- a/src/modules/plusgpl/CMakeLists.txt
++++ b/src/modules/plusgpl/CMakeLists.txt
+@@ -11,6 +11,12 @@ add_library(mltplusgpl MODULE
+   utils.c utils.h
+ )
+ 
++# This bundled legacy cJSON has a different public structure/type ABI from
++# modern libcjson. Keep it local to this module when a host links libcjson.
++if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
++  set_source_files_properties(cJSON.c PROPERTIES COMPILE_OPTIONS -fvisibility=hidden)
++endif()
++
+ file(GLOB YML "*.yml")
+ add_custom_target(Other_plsugpl_Files SOURCES
+   ${YML}
+diff --git a/src/modules/plusgpl/filter_rotoscoping.c b/src/modules/plusgpl/filter_rotoscoping.c
+index 782c3942..2e079027 100644
+--- a/src/modules/plusgpl/filter_rotoscoping.c
++++ b/src/modules/plusgpl/filter_rotoscoping.c
+@@ -25,6 +25,7 @@
+ #include "cJSON.h"
+ 
+ #include <math.h>
++#include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -82,14 +83,16 @@ static inline void lerp(const PointF *a, const PointF *b, PointF *result, double
+  * Speed gain? */
+ static inline void lerpHalf(const PointF *a, const PointF *b, PointF *result)
+ {
+-    result->x = (a->x + b->x) * .5;
+-    result->y = (a->y + b->y) * .5;
++    result->x = a->x * .5 + b->x * .5;
++    result->y = a->y * .5 + b->y * .5;
+ }
+ 
+ /** Helper for using qsort with an array of integers. */
+ int ncompare(const void *a, const void *b)
+ {
+-    return *(const int *) a - *(const int *) b;
++    const int left = *(const int *) a;
++    const int right = *(const int *) b;
++    return (left > right) - (left < right);
+ }
+ 
+ /** Turns a json array with two children into a point (x, y tuple). */
+@@ -221,9 +224,15 @@ static void blur(uint8_t *map, int width, int height, int radius, int passes)
+  * \param map array of integers of the dimension width * height.
+  *            The map entries belonging to the points in the polygon will be set to \param set * 255 the others to !set * 255.
+  */
+-static void fillMap(PointF *vertices, int count, int width, int height, int invert, uint8_t *map)
++static int fillMap(PointF *vertices, int count, int width, int height, int invert, uint8_t *map)
+ {
+-    int nodes, nodeX[1024], pixelY, i, j, value;
++    int nodes, pixelY, i, j, value;
++    if (count < 0 || count > INT_MAX / (int) sizeof(int) || width <= 0 || height <= 0
++        || width > INT_MAX / height)
++        return 1;
++    int *nodeX = count ? malloc((size_t) count * sizeof(int)) : NULL;
++    if (count && !nodeX)
++        return 1;
+ 
+     value = !invert * 255;
+     memset(map, invert * 255, width * height);
+@@ -236,16 +245,28 @@ static void fillMap(PointF *vertices, int count, int width, int height, int inve
+          * and therefore indicate a move from in to out or vice versa
+          */
+         nodes = 0;
+-        for (i = 0, j = count - 1; i < count; j = i++)
+-            if ((vertices[i].y > (double) pixelY) != (vertices[j].y > (double) pixelY))
+-                nodeX[nodes++] = (int) (vertices[i].x
+-                                        + (pixelY - vertices[i].y) / (vertices[j].y - vertices[i].y)
+-                                              * (vertices[j].x - vertices[i].x));
++        for (i = 0, j = count - 1; i < count; j = i++) {
++            if (!isfinite(vertices[i].x) || !isfinite(vertices[i].y)) {
++                free(nodeX);
++                return 1;
++            }
++            if ((vertices[i].y > (double) pixelY) != (vertices[j].y > (double) pixelY)) {
++                const double t = (pixelY - vertices[i].y) / (vertices[j].y - vertices[i].y);
++                const double x = vertices[i].x * (1 - t) + vertices[j].x * t;
++                if (!isfinite(x)) {
++                    free(nodeX);
++                    return 1;
++                }
++                // Clip before narrowing: offscreen native coordinates can
++                // exceed the range of an int without affecting the fill.
++                nodeX[nodes++] = x <= 0 ? 0 : x >= width ? width : (int) x;
++            }
++        }
+ 
+         qsort(nodeX, nodes, sizeof(int), ncompare);
+ 
+         // Set map values for points between the node pairs to 1
+-        for (i = 0; i < nodes; i += 2) {
++        for (i = 0; i + 1 < nodes; i += 2) {
+             if (nodeX[i] >= width)
+                 break;
+ 
+@@ -256,6 +277,8 @@ static void fillMap(PointF *vertices, int count, int width, int height, int inve
+             }
+         }
+     }
++    free(nodeX);
++    return 0;
+ }
+ 
+ /** Determines the point in the middle of the Bézier curve (t = 0.5) defined by \param p1 and \param p2
+@@ -277,34 +300,57 @@ static void deCasteljau(BPointF *p1, BPointF *p2, BPointF *mid)
+ }
+ 
+ /**
+- * Calculates points for the cubic Bézier curve defined by \param p1 and \param p2.
+- * Points are calculated until the squared distanced between neighbour points is smaller than 2.
++ * Calculates a bounded polygon for the cubic Bézier curve. Test the whole
++ * control polygon, not only the chord: coincident anchors can enclose a loop.
++ * Each leaf emits its first anchor; the following curve supplies its endpoint.
+  * \param points Pointer to list of points. Will be allocated and filled with calculated points.
+  * \param count Number of calculated points in \param points
+  * \param size Allocated size of \param points (in elements not in bytes)
+  */
+-static void curvePoints(BPointF p1, BPointF p2, PointF **points, int *count, int *size)
+-{
+-    double errorSqr = SQR(p1.p.x - p2.p.x) + SQR(p1.p.y - p2.p.y);
++#define ROTO_MAX_VERTICES (1024 * 1024)
++#define ROTO_MAX_DEPTH 32
+ 
+-    if (*count + 1 >= *size) {
+-        *size += (int) sqrt(errorSqr / 2) + 1;
+-        *points = mlt_pool_realloc(*points, *size * sizeof(struct PointF));
++static int appendPoint(PointF point, PointF **points, int *count, int *size)
++{
++    if (*count >= ROTO_MAX_VERTICES)
++        return 1;
++    if (*count == *size) {
++        const int capacity = *size ? MIN(*size * 2, ROTO_MAX_VERTICES) : 256;
++        PointF *grown = realloc(*points, (size_t) capacity * sizeof(PointF));
++        if (!grown)
++            return 1;
++        *points = grown;
++        *size = capacity;
+     }
++    (*points)[(*count)++] = point;
++    return 0;
++}
+ 
+-    (*points)[(*count)++] = p1.p;
++static int subdivideCurve(BPointF p1, BPointF p2, PointF **points, int *count, int *size, int depth)
++{
++    const double first = SQR(p1.p.x - p1.h2.x) + SQR(p1.p.y - p1.h2.y);
++    const double middle = SQR(p1.h2.x - p2.h1.x) + SQR(p1.h2.y - p2.h1.y);
++    const double last = SQR(p2.h1.x - p2.p.x) + SQR(p2.h1.y - p2.p.y);
+ 
+-    if (errorSqr <= 2)
+-        return;
++    if (first <= 2 && middle <= 2 && last <= 2)
++        return appendPoint(p1.p, points, count, size);
++    if (depth >= ROTO_MAX_DEPTH)
++        return 1;
+ 
+     BPointF mid;
+     deCasteljau(&p1, &p2, &mid);
++    if (subdivideCurve(p1, mid, points, count, size, depth + 1))
++        return 1;
++    return subdivideCurve(mid, p2, points, count, size, depth + 1);
++}
+ 
+-    curvePoints(p1, mid, points, count, size);
+-
+-    curvePoints(mid, p2, points, count, size);
+-
+-    (*points)[*(count)++] = p2.p;
++static int curvePoints(BPointF p1, BPointF p2, PointF **points, int *count, int *size)
++{
++    const PointF controls[] = {p1.p, p1.h2, p2.h1, p2.p};
++    for (int i = 0; i < 4; i++)
++        if (!isfinite(controls[i].x) || !isfinite(controls[i].y))
++            return 1;
++    return subdivideCurve(p1, p2, points, count, size, 0);
+ }
+ 
+ /** Do it :-).
+@@ -383,18 +429,29 @@ static int filter_get_image(mlt_frame frame,
+         }
+ 
+         count = 0;
+-        size = 1;
+-        points = mlt_pool_alloc(size * sizeof(struct PointF));
++        size = 0;
++        points = NULL;
+         for (i = 0; i < bcount; i++) {
+             j = (i + 1) % bcount;
+-            curvePoints(bpoints[i], bpoints[j], &points, &count, &size);
++            if (curvePoints(bpoints[i], bpoints[j], &points, &count, &size)) {
++                free(points);
++                return 1;
++            }
+         }
+ 
+         if (count) {
++            if (*width <= 0 || *height <= 0 || *width > INT_MAX / *height) {
++                free(points);
++                return 1;
++            }
+             length = *width * *height;
+-            uint8_t *map = mlt_pool_alloc(length);
++            uint8_t *map = malloc(length);
+             int invert = mlt_properties_get_int(unique, "invert");
+-            fillMap(points, count, *width, *height, invert, map);
++            if (!map || fillMap(points, count, *width, *height, invert, map)) {
++                free(map);
++                free(points);
++                return 1;
++            }
+ 
+             int feather = mlt_properties_get_int(unique, "feather");
+             if (feather && mode != MODE_RGB) {
+@@ -518,10 +575,10 @@ static int filter_get_image(mlt_frame frame,
+                 break;
+             }
+ 
+-            mlt_pool_release(map);
++            free(map);
+         }
+ 
+-        mlt_pool_release(points);
++        free(points);
+     }
+ 
+     return error;
+diff --git a/src/modules/rtaudio/consumer_rtaudio.yml b/src/modules/rtaudio/consumer_rtaudio.yml
+index 71e86280..8bd98d78 100644
+--- a/src/modules/rtaudio/consumer_rtaudio.yml
++++ b/src/modules/rtaudio/consumer_rtaudio.yml
+@@ -8,8 +8,7 @@ description: >
+ url: http://www.music.mcgill.ca/~gary/rtaudio/
+ version: 4
+ copyright: Meltytech, LLC
+-creator: Dan Dennedy
+-creator: Gary P. Scavone
++creator: Dan Dennedy, Gary P. Scavone
+ license: LGPLv2.1
+ language: en
+ tags:
+diff --git a/src/modules/sdl2/consumer_sdl2_audio.c b/src/modules/sdl2/consumer_sdl2_audio.c
+index 1fac31fe..03dbaccf 100644
+--- a/src/modules/sdl2/consumer_sdl2_audio.c
++++ b/src/modules/sdl2/consumer_sdl2_audio.c
+@@ -61,6 +61,7 @@ struct consumer_sdl_s
+     pthread_mutex_t video_mutex;
+     pthread_cond_t video_cond;
+     int out_channels;
++    SDL_AudioDeviceID audio_device;
+ 
+     pthread_cond_t refresh_cond;
+     pthread_mutex_t refresh_mutex;
+@@ -234,10 +235,18 @@ int consumer_stop(mlt_consumer parent)
+         pthread_mutex_lock(&self->audio_mutex);
+         pthread_cond_broadcast(&self->audio_cond);
+         pthread_mutex_unlock(&self->audio_mutex);
++        // Closing our device must finish callbacks before consumer memory is freed,
++        // even while another consumer keeps SDL's audio subsystem initialized.
++        if (self->audio_device) {
++            SDL_CloseAudioDevice(self->audio_device);
++            self->audio_device = 0;
++        }
++        pthread_mutex_lock(&mlt_sdl_mutex);
+ #ifdef _WIN32
+         if (!self->no_quit_subsystem)
+ #endif
+             SDL_QuitSubSystem(SDL_INIT_AUDIO);
++        pthread_mutex_unlock(&mlt_sdl_mutex);
+     }
+ 
+     return 0;
+@@ -331,6 +340,12 @@ static int consumer_play_audio(consumer_sdl self, mlt_frame frame, int init_audi
+     }
+ 
+     if (init_audio == 1) {
++        // A timed-out device may be replaced by this same consumer. Finish its
++        // callbacks before reusing buffers or losing ownership of the device.
++        if (self->audio_device) {
++            SDL_CloseAudioDevice(self->audio_device);
++            self->audio_device = 0;
++        }
+         SDL_AudioSpec request;
+         SDL_AudioSpec got;
+         SDL_AudioDeviceID dev;
+@@ -372,6 +387,7 @@ static int consumer_play_audio(consumer_sdl self, mlt_frame frame, int init_audi
+                          SDL_GetCurrentAudioDriver(),
+                          got.channels,
+                          got.freq);
++            self->audio_device = dev;
+             SDL_PauseAudioDevice(dev, 0);
+             init_audio = 0;
+             self->out_channels = got.channels;
+diff --git a/src/modules/xml/producer_xml.c b/src/modules/xml/producer_xml.c
+index 07021bae..0429025f 100644
+--- a/src/modules/xml/producer_xml.c
++++ b/src/modules/xml/producer_xml.c
+@@ -30,6 +30,8 @@
+ 
+ #ifndef _MSC_VER
+ #include <unistd.h>
++#else
++#include <direct.h>
+ #endif
+ 
+ #include <libxml/parser.h>
+diff --git a/src/tests/CMakeLists.txt b/src/tests/CMakeLists.txt
+index 22ab36b5..5efe8d53 100644
+--- a/src/tests/CMakeLists.txt
++++ b/src/tests/CMakeLists.txt
+@@ -48,6 +48,33 @@ add_qt_test(TEST_NAME service)
+ add_qt_test(TEST_NAME tractor)
+ add_qt_test(TEST_NAME xml)
+ 
++if(UNIX)
++  add_executable(test_luma_bounds
++    test_luma_bounds/test_luma_bounds.c
++    ../modules/core/transition_composite.c
++  )
++  target_compile_options(test_luma_bounds PRIVATE ${MLT_COMPILE_OPTIONS})
++  target_link_libraries(test_luma_bounds PRIVATE mlt m)
++  add_test(NAME "Native:luma_bounds" COMMAND test_luma_bounds)
++  set_tests_properties("Native:luma_bounds" PROPERTIES TIMEOUT 30)
++endif()
++
++if(MOD_PLUSGPL)
++  # Include the private rasterizer in a C regression executable so bounds and
++  # allocation/depth failures are checked independently of plugin discovery.
++  add_executable(test_rotoscoping
++    test_rotoscoping/test_rotoscoping.c
++    ../modules/plusgpl/cJSON.c
++  )
++  target_compile_options(test_rotoscoping PRIVATE ${MLT_COMPILE_OPTIONS})
++  target_link_libraries(test_rotoscoping PRIVATE mlt)
++  if(NOT MSVC)
++    target_link_libraries(test_rotoscoping PRIVATE m)
++  endif()
++  add_test(NAME "Native:rotoscoping" COMMAND test_rotoscoping)
++  set_tests_properties("Native:rotoscoping" PROPERTIES TIMEOUT 30)
++endif()
++
+ if(MOD_AVFORMAT)
+   add_qt_test(TEST_NAME mod_avformat)
+ endif()
+diff --git a/src/tests/test_playlist/test_playlist.cpp b/src/tests/test_playlist/test_playlist.cpp
+index 637d1940..c9dea415 100644
+--- a/src/tests/test_playlist/test_playlist.cpp
++++ b/src/tests/test_playlist/test_playlist.cpp
+@@ -16,6 +16,13 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <algorithm>
++#include <array>
++#include <climits>
++#include <limits>
++#include <memory>
++#include <utility>
++#include <vector>
+ #include <QtTest>
+ 
+ #include <mlt++/Mlt.h>
+@@ -33,6 +40,12 @@ public:
+         Factory::init();
+     }
+ 
++private:
++    static void onBulkEntryInfoEvent(mlt_properties, void *data, mlt_event_data)
++    {
++        ++*static_cast<int *>(data);
++    }
++
+ private Q_SLOTS:
+ 
+     void Append()
+@@ -375,6 +388,289 @@ private Q_SLOTS:
+         QCOMPARE(pl.count(), 2);
+         QCOMPARE(pl.get_playtime(), 15);
+     }
++    void BulkEntryInfoMatchesLegacyAndSlices()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        Producer q(profile, "color", "blue");
++        QVERIFY(pl.is_valid());
++        QVERIFY(p.is_valid());
++        QVERIFY(q.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        q.set("length", 100);
++        q.set_in_and_out(0, 99);
++        QCOMPARE(pl.append(p, 5, 12), 0);
++        QCOMPARE(pl.blank(3), 0);
++        QCOMPARE(pl.append(p, 30, 44), 0);
++        QCOMPARE(pl.repeat(2, 3), 0);
++        QCOMPARE(pl.append(q, 0, 0), 0);
++        QCOMPARE(pl.append(p, 60, 64), 0);
++        QCOMPARE(pl.repeat(4, 2), 0);
++        QCOMPARE(pl.count(), 5);
++
++        std::array<mlt_playlist_entry_info, 5> entries{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, entries.size(), entries.data()),
++                 0);
++        qint64 start = 0;
++        for (int i = 0; i < pl.count(); ++i) {
++            mlt_playlist_clip_info legacy;
++            QCOMPARE(mlt_playlist_get_clip_info(pl.get_playlist(), &legacy, i), 0);
++            const auto &entry = entries[i];
++            QCOMPARE(entry.producer, legacy.producer);
++            QCOMPARE(entry.cut, legacy.cut);
++            QCOMPARE(entry.frame_in, legacy.frame_in);
++            QCOMPARE(entry.frame_out, legacy.frame_out);
++            QCOMPARE(entry.frame_count, legacy.frame_count);
++            QCOMPARE(entry.repeat, legacy.repeat);
++            QCOMPARE(start, qint64(legacy.start));
++            QVERIFY(entry.frame_count >= 0);
++            QVERIFY(qint64(entry.frame_count) <= std::numeric_limits<qint64>::max() - start);
++            start += qint64(entry.frame_count);
++        }
++        QCOMPARE(start, qint64(pl.get_playtime()));
++        QCOMPARE(entries[0].producer, entries[2].producer);
++        QCOMPARE(entries[0].producer, entries[4].producer);
++        QVERIFY(entries[0].cut != entries[2].cut);
++        QCOMPARE(entries[2].frame_count, mlt_position(45));
++        QCOMPARE(entries[2].repeat, 3);
++        QCOMPARE(entries[4].frame_count, mlt_position(10));
++        QCOMPARE(entries[4].repeat, 2);
++        QVERIFY(pl.is_blank(1));
++
++        std::array<mlt_playlist_entry_info, 2> slice{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 2, slice.size(), slice.data()), 0);
++        for (int i = 0; i < int(slice.size()); ++i) {
++            QCOMPARE(slice[i].producer, entries[i + 2].producer);
++            QCOMPARE(slice[i].cut, entries[i + 2].cut);
++            QCOMPARE(slice[i].frame_in, entries[i + 2].frame_in);
++            QCOMPARE(slice[i].frame_out, entries[i + 2].frame_out);
++            QCOMPARE(slice[i].frame_count, entries[i + 2].frame_count);
++            QCOMPARE(slice[i].repeat, entries[i + 2].repeat);
++        }
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 0, nullptr), 0);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), pl.count(), 0, nullptr), 0);
++        Playlist empty(profile);
++        QCOMPARE(mlt_playlist_get_entries_info(empty.get_playlist(), 0, 0, nullptr), 0);
++    }
++
++    void BulkEntryInfoInvalidDoesNotWrite()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        QCOMPARE(pl.append(p, 0, 9), 0);
++        QCOMPARE(pl.blank(4), 0);
++        std::array<mlt_playlist_entry_info, 3> entries{};
++        for (auto &entry : entries) {
++            entry.producer = p.get_producer();
++            entry.cut = p.get_producer();
++            entry.frame_in = 91;
++            entry.frame_out = 97;
++            entry.frame_count = 21;
++            entry.repeat = 3;
++        }
++        const QByteArray original(reinterpret_cast<const char *>(entries.data()), sizeof(entries));
++        const std::array<std::pair<int, int>, 8> invalid{{{-1, 1},
++                                                          {0, -1},
++                                                          {pl.count() + 1, 0},
++                                                          {pl.count(), 1},
++                                                          {1, pl.count()},
++                                                          {INT_MAX, 1},
++                                                          {1, INT_MAX},
++                                                          {INT_MAX, INT_MAX}}};
++        for (const auto &range : invalid) {
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(),
++                                                   range.first,
++                                                   range.second,
++                                                   entries.data()),
++                     1);
++            QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                     original);
++        }
++        QCOMPARE(mlt_playlist_get_entries_info(nullptr, 0, 1, entries.data()), 1);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 1, nullptr), 1);
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 1, 0, entries.data()), 0);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++
++        // An unavailable later row must not leave an earlier output half-filled.
++        // Restore the test fixture before assertions can return from the slot.
++        auto *saved = pl.get_playlist()->list[1];
++        pl.get_playlist()->list[1] = nullptr;
++        const int result = mlt_playlist_get_entries_info(pl.get_playlist(), 0, 2, entries.data());
++        pl.get_playlist()->list[1] = saved;
++        QCOMPARE(result, 1);
++        QCOMPARE(QByteArray(reinterpret_cast<const char *>(entries.data()), sizeof(entries)),
++                 original);
++    }
++
++    void BulkEntryInfoDoesNotChangePlaybackOrEvents()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        QCOMPARE(pl.append(p, 0, 9), 0);
++        QCOMPARE(pl.blank(4), 0);
++        QCOMPARE(pl.append(p, 20, 29), 0);
++        QCOMPARE(pl.repeat(2, 4), 0);
++        auto *cut = mlt_playlist_get_clip(pl.get_playlist(), 0);
++        QVERIFY(cut != nullptr);
++        // A read must keep cached entry timing until a normal native edit refreshes it.
++        mlt_producer_set_in_and_out(cut, 3, 5);
++        const std::array<mlt_producer, 4> producers{pl.get_producer(),
++                                                    p.get_producer(),
++                                                    cut,
++                                                    mlt_playlist_get_clip(pl.get_playlist(), 1)};
++        for (int i = 0; i < int(producers.size()); ++i) {
++            QVERIFY(producers[i] != nullptr);
++            mlt_producer_seek(producers[i], i + 1);
++            mlt_producer_set_speed(producers[i], 0.25 * (i + 1));
++        }
++        int eventCount = 0;
++        std::vector<std::unique_ptr<Event>> listeners;
++        for (auto *producer : producers) {
++            auto *event = mlt_events_listen(MLT_PRODUCER_PROPERTIES(producer),
++                                            &eventCount,
++                                            "property-changed",
++                                            onBulkEntryInfoEvent);
++            QVERIFY(event != nullptr);
++            listeners.emplace_back(new Event(event));
++        }
++        auto *next = mlt_events_listen(pl.get_properties(),
++                                       &eventCount,
++                                       "playlist-next",
++                                       onBulkEntryInfoEvent);
++        QVERIFY(next != nullptr);
++        listeners.emplace_back(new Event(next));
++        struct Playback
++        {
++            mlt_position position;
++            mlt_position frame;
++            double speed;
++            unsigned int revision;
++            int refs;
++        };
++        std::array<Playback, 4> before{};
++        for (int i = 0; i < int(producers.size()); ++i) {
++            auto *producer = producers[i];
++            auto *properties = MLT_PRODUCER_PROPERTIES(producer);
++            before[i] = {mlt_producer_position(producer),
++                         mlt_producer_frame(producer),
++                         mlt_producer_get_speed(producer),
++                         mlt_properties_revision(properties),
++                         mlt_properties_ref_count(properties)};
++        }
++        const int count = pl.count();
++        const int length = pl.get_playtime();
++        eventCount = 0;
++        std::array<mlt_playlist_entry_info, 3> entries{};
++        for (int i = 0; i < 256; ++i)
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(),
++                                                   0,
++                                                   entries.size(),
++                                                   entries.data()),
++                     0);
++        QCOMPARE(eventCount, 0);
++        QCOMPARE(pl.count(), count);
++        QCOMPARE(pl.get_playtime(), length);
++        QCOMPARE(entries[0].frame_in, mlt_position(0));
++        QCOMPARE(entries[0].frame_out, mlt_position(9));
++        QCOMPARE(entries[0].frame_count, mlt_position(10));
++        QCOMPARE(mlt_producer_get_in(cut), mlt_position(3));
++        QCOMPARE(mlt_producer_get_out(cut), mlt_position(5));
++        for (int i = 0; i < int(producers.size()); ++i) {
++            auto *producer = producers[i];
++            auto *properties = MLT_PRODUCER_PROPERTIES(producer);
++            QCOMPARE(mlt_producer_position(producer), before[i].position);
++            QCOMPARE(mlt_producer_frame(producer), before[i].frame);
++            QCOMPARE(mlt_producer_get_speed(producer), before[i].speed);
++            QCOMPARE(mlt_properties_revision(properties), before[i].revision);
++            QCOMPARE(mlt_properties_ref_count(properties), before[i].refs);
++        }
++    }
++
++    void BulkEntryInfoEnumeratesMoreThan512Entries()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        p.set("length", 100);
++        p.set_in_and_out(0, 99);
++        constexpr int count = 1025;
++        qint64 expectedDuration = 0;
++        // A direct native fixture, with setup outside the getter under test.
++        for (int i = 0; i < count; ++i) {
++            if (i % 3 == 0)
++                QCOMPARE(pl.blank(2), 0);
++            else
++                QCOMPARE(pl.append(p, i % 17, i % 17 + 4), 0);
++            if (i % 23 == 0)
++                QCOMPARE(pl.repeat(i, 2), 0);
++            expectedDuration += (i % 3 == 0 ? 3 : 5) * (i % 23 == 0 ? 2 : 1);
++        }
++        std::array<mlt_playlist_entry_info, 256> entries{};
++        qint64 start = 0;
++        int seen = 0;
++        int batches = 0;
++        while (seen < count) {
++            const int rows = std::min(int(entries.size()), count - seen);
++            QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), seen, rows, entries.data()),
++                     0);
++            ++batches;
++            for (int j = 0; j < rows; ++j) {
++                const int i = seen + j;
++                const auto &entry = entries[j];
++                QCOMPARE(entry.frame_in, mlt_position(i % 3 == 0 ? 0 : i % 17));
++                QCOMPARE(entry.frame_count,
++                         mlt_position((i % 3 == 0 ? 3 : 5) * (i % 23 == 0 ? 2 : 1)));
++                QCOMPARE(entry.repeat, i % 23 == 0 ? 2 : 1);
++                if (i == 0 || i == 512 || i == count - 1) {
++                    mlt_playlist_clip_info legacy;
++                    QCOMPARE(mlt_playlist_get_clip_info(pl.get_playlist(), &legacy, i), 0);
++                    QCOMPARE(start, qint64(legacy.start));
++                    QCOMPARE(entry.cut, legacy.cut);
++                    QCOMPARE(entry.producer, legacy.producer);
++                }
++                QVERIFY(entry.frame_count >= 0);
++                QVERIFY(qint64(entry.frame_count) <= std::numeric_limits<qint64>::max() - start);
++                start += qint64(entry.frame_count);
++            }
++            seen += rows;
++        }
++        QCOMPARE(seen, count);
++        QCOMPARE(batches, 5);
++        QCOMPARE(start, expectedDuration);
++        QCOMPARE(start, qint64(pl.get_playtime()));
++    }
++    void BulkEntryInfoPreservesAutoclosedTiming()
++    {
++        Playlist pl(profile);
++        Producer p(profile, "color", "red");
++        QVERIFY(p.is_valid());
++        QCOMPARE(pl.append(p, 5, 14), 0);
++        QCOMPARE(pl.repeat(0, 2), 0);
++        QCOMPARE(pl.append(p, 20, 24), 0);
++        QCOMPARE(pl.append(p, 30, 34), 0);
++        pl.set("autoclose", 1);
++        QCOMPARE(pl.seek(25), 0);
++        // Only fixture setup retrieves a frame to exercise real native autoclose.
++        std::unique_ptr<Frame> frame(pl.get_frame());
++        QVERIFY(frame != nullptr);
++        QCOMPARE(mlt_playlist_get_clip(pl.get_playlist(), 0), nullptr);
++        mlt_playlist_entry_info entry{};
++        QCOMPARE(mlt_playlist_get_entries_info(pl.get_playlist(), 0, 1, &entry), 0);
++        QCOMPARE(entry.producer, nullptr);
++        QCOMPARE(entry.cut, nullptr);
++        QCOMPARE(entry.frame_in, mlt_position(5));
++        QCOMPARE(entry.frame_out, mlt_position(14));
++        QCOMPARE(entry.frame_count, mlt_position(20));
++        QCOMPARE(entry.repeat, 2);
++    }
+ };
+ 
+ QTEST_APPLESS_MAIN(TestPlaylist)
+diff --git a/src/tests/test_service/test_service.cpp b/src/tests/test_service/test_service.cpp
+index 90206b6e..10503e38 100644
+--- a/src/tests/test_service/test_service.cpp
++++ b/src/tests/test_service/test_service.cpp
+@@ -16,7 +16,11 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <climits>
++#include <memory>
+ #include <mlt++/Mlt.h>
++#include <QDir>
++#include <QTemporaryFile>
+ #include <QtTest>
+ using namespace Mlt;
+ 
+@@ -30,6 +34,168 @@ public:
+     ~TestService() { Factory::close(); }
+ 
+ private Q_SLOTS:
++    void CroppedTransitionProgress()
++    {
++        Profile profile("dv_pal");
++        Transition transition(profile, "luma");
++        const auto handle = mlt_frame_init(nullptr);
++        Frame frame(handle);
++        mlt_frame_close(handle); // The C++ wrapper owns its added reference.
++        QVERIFY(transition.is_valid());
++        transition.set_in_and_out(30, 40);
++        mlt_frame_set_position(frame.get_frame(), 35);
++        QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                 5.0 / 11);
++        transition.set("kdenlive:mix_progress_offset", 10);
++        transition.set("kdenlive:mix_progress_length", 41);
++        for (int position = 30; position <= 40; ++position) {
++            mlt_frame_set_position(frame.get_frame(), position);
++            QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                     (position - 20.0) / 41);
++            QVERIFY(qAbs(mlt_transition_get_progress_delta(transition.get_transition(),
++                                                           frame.get_frame())
++                         - 0.5 / 41)
++                    < 1e-12);
++        }
++        // Moving a cropped transition must not move its source animation phase.
++        transition.set_in_and_out(130, 140);
++        mlt_frame_set_position(frame.get_frame(), 135);
++        QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                 15.0 / 41);
++        // Malformed, partial and overflowing optional metadata must use the
++        // unchanged native range calculation, never overflow or divide by zero.
++        const QList<QPair<qint64, qint64>> invalid{{-1, 41},
++                                                   {10, 0},
++                                                   {10, -1},
++                                                   {41, 41},
++                                                   {35, 41},
++                                                   {0, qint64(INT_MAX) + 1}};
++        for (const auto &range : invalid) {
++            transition.set("kdenlive:mix_progress_offset", int64_t(range.first));
++            transition.set("kdenlive:mix_progress_length", int64_t(range.second));
++            QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                     5.0 / 11);
++            QVERIFY(qAbs(mlt_transition_get_progress_delta(transition.get_transition(),
++                                                           frame.get_frame())
++                         - 0.5 / 11)
++                    < 1e-12);
++        }
++        transition.set("kdenlive:mix_progress_offset", 10);
++        transition.clear("kdenlive:mix_progress_length");
++        QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                 5.0 / 11);
++        for (const char *text : {"invalid", "10.5", "9999999999999999999999999999999"}) {
++            transition.set("kdenlive:mix_progress_length", "41");
++            transition.set("kdenlive:mix_progress_offset", text);
++            QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()),
++                     5.0 / 11);
++        }
++        transition.set_in_and_out(30, 30);
++        transition.set("kdenlive:mix_progress_offset", 0);
++        transition.set("kdenlive:mix_progress_length", 1);
++        mlt_frame_set_position(frame.get_frame(), 30);
++        QCOMPARE(mlt_transition_get_progress(transition.get_transition(), frame.get_frame()), 0.5);
++        QCOMPARE(mlt_transition_get_progress_delta(transition.get_transition(), frame.get_frame()),
++                 0.5);
++    }
++
++    void CroppedLumaKeepsOriginalRenderedProgress()
++    {
++        Profile profile("dv_pal");
++        profile.get_profile()->width = 32;
++        profile.get_profile()->height = 24;
++        QTemporaryFile luma(QDir::tempPath() + "/mlt-phase-XXXXXX.pgm");
++        QVERIFY(luma.open());
++        QByteArray pgm("P5\n32 24\n255\n");
++        for (int y = 0; y < 24; ++y)
++            for (int x = 0; x < 32; ++x)
++                pgm.append(char(x * 255 / 31));
++        QCOMPARE(luma.write(pgm), qint64(pgm.size()));
++        QVERIFY(luma.flush());
++        for (bool progressive : {false, true}) {
++            profile.get_profile()->progressive = progressive;
++            for (bool wipe : {false, true}) {
++                const auto make = [&](int first, int last, int offset) {
++                    auto tractor = std::make_unique<Tractor>(profile);
++                    Producer red(profile, "color", "red"), blue(profile, "color", "blue");
++                    red.set_in_and_out(0, 199);
++                    blue.set_in_and_out(0, 199);
++                    tractor->set_track(red, 0);
++                    tractor->set_track(blue, 1);
++                    Transition transition(profile, "luma");
++                    transition.set_in_and_out(first, last);
++                    transition.set("fix_background_alpha", 1);
++                    if (wipe) {
++                        transition.set("resource", luma.fileName().toUtf8().constData());
++                        transition.set("softness", 0.1);
++                    }
++                    if (offset >= 0) {
++                        transition.set("kdenlive:mix_progress_offset", offset);
++                        transition.set("kdenlive:mix_progress_length", 41);
++                    }
++                    tractor->plant_transition(transition, 0, 1);
++                    return tractor;
++                };
++                const auto sample = [&](Producer &tractor, int position) {
++                    tractor.seek(position);
++                    std::unique_ptr<Frame> frame(tractor.get_frame());
++                    mlt_image_format format = mlt_image_yuv422;
++                    int width = 32, height = 24;
++                    auto data = frame->get_image(format, width, height);
++                    if (!data || format != mlt_image_yuv422 || width != 32 || height != 24)
++                        return QByteArray();
++                    return QByteArray(reinterpret_cast<const char *>(data), width * height * 2);
++                };
++                auto original = make(20, 60, -1), cropped = make(30, 40, 10),
++                     moved = make(130, 140, 10), recropped = make(32, 38, 12);
++                const auto serialize = [&](Producer &producer) {
++                    Consumer xml(profile, "xml", "string");
++                    xml.set("no_meta", 1);
++                    xml.connect(producer);
++                    if (xml.start() != 0 || !xml.get("string"))
++                        return QByteArray();
++                    return QByteArray(xml.get("string"));
++                };
++                const auto croppedXml = serialize(*cropped), originalXml = serialize(*original);
++                QVERIFY(croppedXml.contains("kdenlive:mix_progress_offset"));
++                QVERIFY(!originalXml.isEmpty());
++                Producer reloaded(profile, "xml-string", croppedXml.constData());
++                Producer originalReloaded(profile, "xml-string", originalXml.constData());
++                QVERIFY(reloaded.is_valid());
++                QVERIFY(originalReloaded.is_valid());
++                const auto first = sample(*original, 30), last = sample(*original, 40);
++                QVERIFY(!first.isEmpty());
++                QVERIFY(first != last); // Prove the test samples an actual dissolve.
++                for (int position = 30; position <= 40; ++position) {
++                    const auto reference = sample(*original, position);
++                    QVERIFY(!reference.isEmpty());
++                    QCOMPARE(sample(*cropped, position), reference);
++                    QCOMPARE(sample(*moved, position + 100), reference);
++                    const auto savedReference = sample(originalReloaded, position);
++                    QVERIFY(!savedReference.isEmpty());
++                    const auto savedActual = sample(reloaded, position);
++                    if (savedActual != savedReference) {
++                        int changed = 0, firstByte = -1, maximum = 0;
++                        for (int byte = 0; byte < qMin(savedActual.size(), savedReference.size()); ++byte) {
++                            const int difference = qAbs(int(uchar(savedActual[byte])) - int(uchar(savedReference[byte])));
++                            if (difference) {
++                                ++changed;
++                                if (firstByte < 0) firstByte = byte;
++                                maximum = qMax(maximum, difference);
++                            }
++                        }
++                        qWarning() << "Reload mismatch" << progressive << wipe << position << changed << firstByte << maximum;
++                        qWarning() << "Original XML" << originalXml;
++                        qWarning() << "Cropped XML" << croppedXml;
++                    }
++                    QCOMPARE(savedActual, savedReference);
++                    if (position >= 32 && position <= 38)
++                        QCOMPARE(sample(*recropped, position), reference);
++                }
++            }
++        }
++    }
++
+     void CanIdentifyServicesFromFactory()
+     {
+         Profile profile;
+diff --git a/src/tests/test_xml/test_xml.cpp b/src/tests/test_xml/test_xml.cpp
+index e12bb298..a7434af8 100644
+--- a/src/tests/test_xml/test_xml.cpp
++++ b/src/tests/test_xml/test_xml.cpp
+@@ -16,6 +16,9 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <QDir>
++#include <QFile>
++#include <QTemporaryDir>
+ #include <QString>
+ #include <QtTest>
+ 
+@@ -37,6 +40,34 @@ public:
+ 
+ private Q_SLOTS:
+ 
++    void RelativeXmlPathUsesCurrentDirectory()
++    {
++        QTemporaryDir directory;
++        QVERIFY(directory.isValid());
++        QVERIFY(QDir(directory.path()).mkdir("relative"));
++        QFile file(directory.filePath("relative/project.mlt"));
++        QVERIFY(file.open(QIODevice::WriteOnly));
++        const QByteArray xml = R"(<mlt producer="main">
++  <producer id="color0" in="0" out="9">
++    <property name="mlt_service">color</property>
++    <property name="resource">red</property>
++  </producer>
++  <playlist id="main"><entry producer="color0" in="0" out="9"/></playlist>
++</mlt>)";
++        QCOMPARE(file.write(xml), qint64(xml.size()));
++        file.close();
++        struct RestoreDirectory {
++            QString path{QDir::currentPath()};
++            ~RestoreDirectory() { QDir::setCurrent(path); }
++        } restore;
++        QVERIFY(QDir::setCurrent(directory.path()));
++        Profile profile;
++        // The separator makes XML resolve its relative root using getcwd().
++        Producer producer(profile, "xml", "relative/project.mlt");
++        QVERIFY(producer.is_valid());
++        QCOMPARE(producer.get_length(), 10);
++    }
++
+     void NestedPropertiesRoundTrip()
+     {
+         // Create a producer

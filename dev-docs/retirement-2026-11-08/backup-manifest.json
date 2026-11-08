@@ -1,0 +1,91 @@
+{
+  "date": "2026-11-08",
+  "baselineCommit": "c62bb3acdabfa300c8ac2f58bb9e74fde869e98e",
+  "backupBranch": "archive/local-retirement-2026-11-08",
+  "fullEditorCoverageVerified": false,
+  "uniqueSnapshots": [
+    {
+      "name": "initial-linux",
+      "files": 7,
+      "uncompressedBytes": 133125
+    },
+    {
+      "name": "native-start",
+      "files": 7,
+      "uncompressedBytes": 198523
+    }
+  ],
+  "files": [
+    {
+      "path": "dev-docs/retirement-2026-11-08/DEPENDENCIES.md",
+      "bytes": 1685,
+      "sha256": "15bc221c1d991e2847e09b62b1e6811a54048e9fb9e80aff45d6d1cbaa747ff1"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/README.md",
+      "bytes": 2751,
+      "sha256": "60a113f29ff1d2d3c06bacc5eb61e68c88aebb0ec209942d196b794fb296d53c"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/UNFINISHED-CHECKPOINT.md",
+      "bytes": 3813,
+      "sha256": "eac6e2a164f2548aafa5d47c216c1af52a42fba5f9ea92dcfc7d6b01b1aa474c"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/VERIFICATION.json",
+      "bytes": 1412,
+      "sha256": "6b28fc827c542b192132517fb0acf8d8d0586b1f274e69b74bc49430c82897f8"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/dependencies-fedora.json",
+      "bytes": 98751,
+      "sha256": "33725d2b82964ebdb827a56bf62697497c0235f0db0152ae102e1b2e01045621"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/dependency-versions.json",
+      "bytes": 1280,
+      "sha256": "0e5711e4b33d15fa5b59650de60165b12c34ab616323e7c6637fd2339aa9e352"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/historical-recovery-source-manifest.json",
+      "bytes": 25216,
+      "sha256": "db588939902d335dd06f48a79f1b73657c0d9e77cfbe9d9affa7b61a16a5e560"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/historical-recovery-source.tar.gz",
+      "bytes": 478053,
+      "sha256": "106e0d3bfb8588d460de58da1f22d9461163bae07755210d82e3e4128316301f"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/initial-linux-unique-source.tar.gz",
+      "bytes": 35096,
+      "sha256": "2ebb62e78e156bfeb2e4f1e4919a05c05579e30ecd04a96141420a1a89990994"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/native-start-unique-source.tar.gz",
+      "bytes": 47590,
+      "sha256": "a29ffd167dbbc95513bcaab96cb23fabebda95b65e0273759da3632c53778304"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/packages-installed-for-project.txt",
+      "bytes": 22258,
+      "sha256": "3900a4b2be2e2203cd70b373dcd8bf6012879e3660b1e6165dc1f84067c13ee6"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/reproduction-tools.tar.gz",
+      "bytes": 8812,
+      "sha256": "4e30313b5e0094e95ac1f82731e256830aadd29a67ef2641fb9731d62d7a2b9c"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/test_luma_bounds.c",
+      "bytes": 4514,
+      "sha256": "8210fc574a11c82dc9fbbb1ba3fc6e7c30d79731ea29140757a7b4cc9826c0d0"
+    },
+    {
+      "path": "dev-docs/retirement-2026-11-08/unfinished-mlt-worktree.patch",
+      "bytes": 50357,
+      "sha256": "f59ff7e9865f7249b6bd4dea0529b45b42b12a14f1545669ab68964ad99cb763"
+    }
+  ],
+  "metadataRedacted": true
+}

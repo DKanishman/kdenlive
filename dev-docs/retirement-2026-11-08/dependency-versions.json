@@ -1,0 +1,20 @@
+{
+  "mltRevision": "eca4e32d28e2c588a9c3b7c23e2276d9cd1f4edb",
+  "registeredPatches": {
+    "mlt-playlist-entry-info.patch": "38dbea7e125425fab4e4d8de23f6c1b10c8c4d6ef17d14422896f163870d7a02",
+    "mlt-sdl2-audio-device-lifetime.patch": "5cb0965cc1adef1f90e3e107020deadee2f41d5bd12a3146b0d7b3c3a3b805a4",
+    "mlt-openfx-factory-export.patch": "8bd03d57bb7e0fb21a84e7646220edcaed5d206d5b30393c69e6d984ae826a08",
+    "mlt-xml-windows-getcwd.patch": "0f60a19dbc48a696e080c04d8259d956d61c48f0e4bb51a6ac6088c19240435c",
+    "mlt-rotoscoping-bounds.patch": "d9524aafbacd5ebb9a3db6e0b97ac83e2d8cb014efd81d4213c568ebfa480435",
+    "mlt-metadata-validation.patch": "e5a43ccbbf1055d1cd807b8f80d652c8e25001dfc2e4ef0d129af7db2ef70ae3",
+    "mlt-private-cjson.patch": "fedfdd8d23c0943bd30f900a94c3767eb814ae473a40b07fa3f9a35640b7eefe"
+  },
+  "ffmpegRevision": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "x264Revision": "31e19f92f00c7003fa115047ce50978bc98c3a0d",
+  "qtVersion": "6.11.2",
+  "kfVersion": "6.31.0",
+  "privateQmlRpm": "kf6-qqc2-desktop-style-6.31.0-1.fc45.x86_64",
+  "privateImageFormatsRpm": "qt6-qtimageformats-6.11.2-1.fc45.x86_64",
+  "publishedExecutableSha256": "017c302a0c8fae0467c2859a5f2edf033610944cc266610a6c005619a71541aa",
+  "fullEditorCoverageVerified": false
+}

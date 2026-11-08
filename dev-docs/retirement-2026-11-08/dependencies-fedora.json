@@ -1,0 +1,3566 @@
+[
+  {
+    "id": 11,
+    "command": "dnf install lilv-devel pango-devel",
+    "packages": [
+      {
+        "nevra": "lilv-devel-0:0.28.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pango-devel-0:1.58.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fribidi-devel-0:1.0.16-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libXft-devel-0:2.3.8-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libthai-devel-0:0.1.30-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lv2-devel-0:1.18.10-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lv2-0:1.18.10-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-markdown-0:3.11-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-rdflib-0:7.6.0-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "serd-devel-0:0.32.10-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sord-devel-0:0.16.22-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sratom-devel-0:0.6.22-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "zix-devel-0:0.8.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libdatrie-devel-0:0.2.14-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "command": "dnf builddep mlt kdenlive",
+    "packages": [
+      {
+        "nevra": "eigen3-devel-0:5.0.1-4.fc45.noarch",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-rpm-macros-0:6.31.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "php-devel-0:8.5.12-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "mlt-devel-0:7.40.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "doxygen-2:1.18.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kde-qdoc-common-0:1.0.0^20260721.065046.a5a7228-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-doc-devel-0:6.9.1-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-rpm-macros-0:6.11.2-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "autoconf-0:2.73-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "automake-0:1.18.1-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libtool-0:2.5.4-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libxml2-devel-0:2.15.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openssl-devel-1:4.0.3-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pcre2-devel-0:10.47-1.fc45.2.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "php-cli-0:8.5.12-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "php-common-0:8.5.12-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "zlib-ng-compat-devel-0:2.3.3-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "mlt-0:7.40.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "spdlog-0:1.17.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xapian-core-libs-0:1.4.31-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "m4-0:1.4.21-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-File-Compare-0:1.100.800-527.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-File-Copy-0:2.43-527.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-File-Find-0:1.44-527.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-Thread-Queue-0:3.14-527.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-threads-1:2.45-527.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xz-devel-1:5.8.3-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "movit-0:1.7.1-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-core-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-imgproc-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-tracking-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-video-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rnnoise-0:0.2-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sox-0:14.4.2.0-45.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-threads-shared-0:1.73-527.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "movit-data-0:1.7.1-9.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "flexiblas-netlib-0:3.5.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "tbb-0:2023.1.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-calib3d-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-dnn-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libid3tag-0:0.16.4-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libmad-0:0.16.4-16.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opusfile-0:0.12-20.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "flexiblas-0:3.5.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "flexiblas-openblas-openmp-0:3.5.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-features2d-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-flann-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openblas-openmp-0:0.3.34-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sdl2-compat-devel-0:2.32.74-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xorg-x11-proto-devel-0:2025.1-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "alsa-lib-devel-0:1.2.16.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kddockwidgets-qt6-devel-0:2.4.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kddockwidgets-qt6-0:2.4.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-karchive-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kbookmarks-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kbookmarks-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kconfig-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcoreaddons-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwidgetsaddons-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kconfig-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kconfigwidgets-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kconfigwidgets-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcodecs-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcolorscheme-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-ki18n-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kguiaddons-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcoreaddons-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcrash-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcrash-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdbusaddons-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdbusaddons-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdoctools-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdoctools-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-Any-URI-Escape-0:0.01-39.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "docbook-dtds-0:1.0-93.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "docbook-style-xsl-0:1.79.2-29.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sgml-common-0:0.6.3-70.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kfilemetadata-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kfilemetadata-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kdegraphics-mobipocket-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "poppler-qt6-0:26.08.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kguiaddons-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-ki18n-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kiconthemes-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kiconthemes-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-breeze-icons-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "breeze-icon-theme-0:6.31.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kitemviews-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kitemviews-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kjobwidgets-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kjobwidgets-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knotifications-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-core-libs-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-file-widgets-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-gui-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-widgets-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-widgets-libs-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-core-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kservice-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcompletion-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-solid-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwindowsystem-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kio-doc-0:6.31.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwallet-libs-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knewstuff-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knewstuff-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-attica-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kpackage-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-syndication-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knotifications-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knotifyconfig-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-knotifyconfig-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kplotting-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kplotting-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-purpose-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-purpose-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "accounts-qml-module-qt6-0:0.7^20231216.05e79eb-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kaccounts-integration-qt6-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libaccounts-qt6-0:1.17-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "signon-qt6-0:8.60^20240205.c8ad982-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcmutils-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libaccounts-glib-0:1.25-28.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kxmlgui-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kglobalaccel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-ktextwidgets-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-ktextwidgets-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-sonnet-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtspeech-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtmultimedia-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtquick3d-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtquicktimeline-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtshadertools-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kxmlgui-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "OpenTimelineIO-devel-0:0.17.0-7.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "OpenTimelineIO-0:0.17.0-7.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtbase-devel-0:6.11.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtbase-ibase-0:6.11.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtbase-mysql-0:6.11.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtbase-odbc-0:6.11.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtbase-postgresql-0:6.11.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libfbclient2-0:5.0.4.1812-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "unixODBC-0:2.3.14-36.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libpq-0:18.4-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "odbcinst-generate-0:2.3.14-36.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qt5compat-devel-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qt5compat-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtmultimedia-devel-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtdeclarative-devel-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtnetworkauth-devel-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtnetworkauth-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtsvg-devel-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qttools-devel-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-designer-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-doctools-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-linguist-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-qttools-libs-designer-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-qttools-libs-designercomponents-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-qttools-libs-help-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-qttools-common-0:6.11.2-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "qt6-qttools-0:6.11.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "ffmpeg-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "fftw-devel-0:3.3.10-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fftw-0:3.3.10-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fftw-libs-0:3.3.10-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fftw-libs-long-0:3.3.10-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fftw-libs-quad-0:3.3.10-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "freetype-devel-0:2.14.3-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "frei0r-devel-0:3.6.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "frei0r-plugins-0:3.6.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gavl-0:1.4.0-41.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libgdither-0:0.6-46.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gdk-pixbuf2-devel-0:2.44.8-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ladspa-devel-0:1.17-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ladspa-0:1.17-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libappstream-glib-0:0.8.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libebur128-devel-0:1.2.6-16.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libexif-devel-0:0.6.26-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libogg-devel-2:1.3.6-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libsamplerate-devel-0:0.2.2-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libvorbis-devel-1:1.3.7-21.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "movit-devel-0:1.7.1-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-devel-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-alphamat-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-aruco-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-bgsegm-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-bioinspired-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-ccalib-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-cvv-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-data-0:4.13.0-11.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-datasets-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-dnn_objdetect-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-dnn_superres-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-dpm-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-face-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-freetype-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-fuzzy-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-gapi-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-hdf-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-hfs-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-highgui-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-img_hash-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-imgcodecs-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-intensity_transform-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-line_descriptor-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-mcc-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-ml-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-objdetect-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-optflow-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-phase_unwrapping-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-photo-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-plot-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-quality-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-rapid-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-reg-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-rgbd-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-saliency-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-shape-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-signal-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-stereo-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-stitching-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-structured_light-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-superres-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-surface_matching-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-text-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-videoio-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-videostab-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-viz-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-wechat_qrcode-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-ximgproc-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-xobjdetect-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencv-xphoto-0:4.13.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "hdf5-0:2.1.1-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gdal-libs-0:3.13.3-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gdcm-0:3.0.24-24.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "coin-or-Clp-0:1.17.11-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "coin-or-CoinUtils-0:2.11.13-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vtk-0:9.6.2-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libaec-0:1.1.7-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "armadillo-0:12.8.1-12.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "blosc-0:1.21.6-12.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cfitsio-0:4.6.4-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "freexl-0:2.0.0-22.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "geos-0:3.15.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libarrow-0:23.0.1-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libarrow-compute-libs-0:23.0.1-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libarrow-dataset-libs-0:23.0.1-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libgeotiff-0:1.7.4-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libgta-0:1.2.1-18.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libkml-0:1.3.0-61.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libqhull_r-1:8.0.2-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libspatialite-0:5.1.0-14.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "muParser-0:2.3.5-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "netcdf-0:4.10.1-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "parquet-libs-0:23.0.1-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-0:9.8.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xerces-c-0:3.3.0-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "CharLS-0:2.4.3-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "MUMPS-0:5.7.3-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "asl-0:20260109-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "coin-or-Cbc-0:2.10.13-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "coin-or-Osi-0:0.108.12-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "suitesparse-0:7.11.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "glpk-0:5.0-17.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "PDAL-libs-0:2.10.2-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "alembic-libs-0:1.8.12-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cgnslib-libs-0:4.5.2-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libharu-0:2.4.5-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "liblas-0:1.8.2-0.33.git0839c6c.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencascade-foundation-0:7.9.3-4.fc45.1.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencascade-modeling-0:7.9.3-4.fc45.1.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencascade-ocaf-0:7.9.3-4.fc45.1.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openslide-0:4.0.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openvr-api-0:2.15.6-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pugixml-0:1.16-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-vtk-0:9.6.2-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "arpack-0:3.9.1-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "minizip-ng-compat-0:4.1.0-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libarrow-doc-0:23.0.1-11.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "liborc2-0:2.3.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "re2-2:20251105-19.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "utf8proc-0:2.11.3-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libarrow-acero-libs-0:23.0.1-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "librttopo-0:1.1.0-20.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "thrift-0:0.24.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "MUMPS-common-0:5.7.3-8.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "metis-0:5.1.0.3-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "scotch-0:7.0.13-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "coin-or-Cgl-0:0.60.10-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libnauty-0:2.9.3-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencascade-visualization-0:7.9.3-4.fc45.1.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libdicom-0:1.3.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vtk-qt-0:9.6.2-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "flexiblas-netlib64-0:3.5.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "protobuf3-0:3.19.6-66.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cliquer-libs-0:1.23-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "opencascade-draw-0:7.9.3-4.fc45.1.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "flexiblas-openblas-openmp64-0:3.5.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openblas-openmp64-0:0.3.34-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pipewire-jack-audio-connection-kit-devel-0:1.6.11-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libarchive-devel-0:3.8.9-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libv4l-devel-0:1.32.0-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rnnoise-devel-0:0.2-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pulseaudio-libs-devel-0:17.0-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-devel-0:3.15.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rubberband-devel-0:4.0.0-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ruby-0:4.0.9-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "ruby-libs-0:4.0.9-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "ruby-devel-0:4.0.9-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "sox-devel-0:14.4.2.0-45.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "swig-0:4.5.1-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "vid.stab-devel-0:1.1.1-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xine-lib-devel-0:1.2.13-36.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "xine-lib-0:1.2.13-36.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libdca-0:0.0.7-16.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libmng-0:2.0.3-26.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libmpcdec-0:1.3.0^20110810svn475-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libxdg-basedir-0:1.2.0-38.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vcdimager-libs-0:2.0.1-25.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rubygems-0:4.0.23-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubypick-0:1.1.1-25.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "clang-libs-0:23.1.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "clang-resource-filesystem-0:23.1.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "brotli-devel-0:1.2.1-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "brotli-0:1.2.1-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "bzip2-devel-0:1.0.8-24.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "harfbuzz-devel-0:15.0.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "glfw-1:3.4-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libGLEW-0:2.2.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "harfbuzz-cairo-0:15.0.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "harfbuzz-gpu-0:15.0.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "harfbuzz-raster-0:15.0.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "harfbuzz-vector-0:15.0.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libpng-devel-2:1.6.59-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libavcodec-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libavdevice-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libavfilter-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libavformat-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libavutil-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libswresample-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libswscale-free-devel-0:9.0.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libxdg-basedir-devel-0:1.2.0-38.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openxr-libs-0:1.1.65-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "tk-1:9.0.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libX11-devel-0:1.8.13-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libglvnd-devel-1:1.7.0-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libglvnd-core-devel-1:1.7.0-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "mesa-libGLU-devel-0:9.0.3-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "assimp-0:6.0.5-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "poly2tri-0:0.0^20130501hg26242d0aa7b8-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libxkbcommon-devel-0:1.13.1-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vulkan-loader-devel-0:1.4.350.0-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vulkan-headers-0:1.4.350.0-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "wayland-devel-0:1.26.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "glib2-devel-0:2.90.1-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "krb5-devel-0:1.22.2-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libkadm5-0:1.22.2-11.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "boost-program-options-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libgfortran-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "openblas-0:0.3.34-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libepoxy-devel-0:1.5.10-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libjpeg-turbo-devel-0:3.1.4.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "laszip-0:3.5.0-6.gita446a0c.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libxcb-devel-0:1.17.0-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-bluez-qt-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdeclarative-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kitemmodels-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-prison-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libdmtx-0:0.7.8-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-sonnet-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-attica-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kservice-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcompletion-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwindowsystem-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-solid-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kded-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kauth-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kauth-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "polkit-qt6-1-0:0.201.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcodecs-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kcolorscheme-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwidgetsaddons-devel-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kirigami-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "glycin-devel-0:2.2.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "graphviz-0:15.1.1-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "aalib-libs-0:1.4.0-0.59.rc5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gts-0:0.7.6-53.20121130.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lasi-0:1.1.3-19.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gpm-libs-0:1.20.7-54.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "netpbm-0:11.14-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gettext-devel-0:1.0-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gettext-common-devel-0:1.0-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "imath-devel-0:3.1.12-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-imath-0:3.1.12-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-python3-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-graph-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rubygem-psych-0:5.3.1-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "ruby-default-gems-0:4.0.9-40.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "keyutils-libs-devel-0:1.6.3-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libcom_err-devel-0:1.47.4-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libselinux-devel-0:3.11-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libsepol-devel-0:3.11-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libverto-devel-0:0.3.2-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cairo-devel-0:1.18.6-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "graphite2-devel-0:1.3.14-22.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libicu-devel-0:78.3-9.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libffi-devel-0:3.5.2-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libmount-devel-0:2.42.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "sysprof-capture-devel-0:51.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libXau-devel-0:1.0.12-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libblkid-devel-0:2.42.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-devel-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-numpy3-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-cobalt-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-context-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-contract-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-coroutine-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-fiber-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-filesystem-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-json-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-log-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-math-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-nowide-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-process-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-serialization-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-stacktrace-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-test-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-timer-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-type_erasure-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-url-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "boost-wave-0:1.90.0-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fontconfig-devel-0:2.18.3-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libseccomp-devel-0:2.6.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libXext-devel-0:1.3.6-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libXrender-devel-0:0.9.12-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lzo-devel-0:2.10-17.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lzo-minilzo-0:2.10-17.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "pixman-devel-0:0.46.2-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-numpy-1:2.5.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "python3-numpy-f2py-1:2.5.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libquadmath-devel-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "hdf-libs-0:4.3.0-7.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "mlt-qt6-0:7.40.0-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kwallet-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qca-qt6-0:2.3.12-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qca-qt6-ossl-0:2.3.12-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kaccounts-providers-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtwebengine-0:6.11.2-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "signon-ui-0:0.15^20240205.eef943f-7.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtpdf-0:6.11.2-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtpositioning-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtwebchannel-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtserialport-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kio-extras-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kdsoap-ws-discovery-client-0:0.4.0-7.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kdsoap6-0:2.2.0-10.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-kdnssd-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-syntax-highlighting-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libkexiv2-qt6-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-ar-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-at-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-au-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-be-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-br-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-ca-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-ch-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-cz-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-de-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-dk-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-es-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-eur-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-fi-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-fo-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-fr-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-hu-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-is-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-jp-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-lv-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-mx-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-nc-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-nl-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-no-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-nz-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-pl-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-pt-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-se-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-si-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-sk-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-uk-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-us-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "proj-data-za-0:9.8.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "php-nikic-php-parser5-0:5.9.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "php-fedora-autoloader-0:1.0.1-18.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "catdoc-0:0.95-31.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "media-player-info-0:23-21.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kf6-sonnet-hunspell-0:6.31.0-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtspeech-flite-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-qtspeech-speechd-0:6.11.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gi-docgen-fonts-0:2026.1-12.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "redhat-display-fonts-0:5.0.0-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "redhat-text-fonts-0:5.0.0-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python3-pip-0:26.1.2-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rubygem-bigdecimal-0:4.0.1-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "ruby-bundled-gems-0:4.0.9-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "redhat-rpm-config-0:345-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "js-doxygen-2:1.18.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gpgverify-0:2.2-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "annobin-plugin-gcc-0:13.28-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gcc-plugin-annobin-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "R-srpm-macros-0:1.3.7-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ansible-srpm-macros-0:1-22.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "build-reproducibility-srpm-macros-0:0.7.3-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cmake-srpm-macros-0:4.3.0-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "dwz-0:0.17-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "efi-srpm-macros-0:6-9.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "filesystem-srpm-macros-0:3.18-59.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fonts-srpm-macros-1:5.0.0-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "forge-srpm-macros-0:0.4.0-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "fpc-srpm-macros-0:1.3-17.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gap-srpm-macros-0:2-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ghc-srpm-macros-0:1.10-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gnat-srpm-macros-0:7-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gnome-srpm-macros-0:1.0-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "go-srpm-macros-0:3.8.0-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "java-srpm-macros-0:1-9.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "kernel-srpm-macros-0:1.0-30.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "lua-srpm-macros-0:1-18.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "ocaml-srpm-macros-0:11-4.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "openblas-srpm-macros-0:2-22.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "package-notes-srpm-macros-0:0.20-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "perl-srpm-macros-0:1-65.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "python-srpm-macros-0:3.15-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt5-srpm-macros-0:5.15.18-3.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "qt6-srpm-macros-0:6.11.2-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rust-srpm-macros-0:28.5-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "tree-sitter-srpm-macros-0:0.4.6-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "zig-srpm-macros-0:1-9.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "web-assets-filesystem-0:5-26.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "annobin-docs-0:13.28-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "add-determinism-0:0.7.3-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "linkdupes-0:0.7.3-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rubygem-io-console-0:0.8.2-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubygem-bundler-0:4.0.20-40.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubygem-rdoc-0:7.0.4-201.fc45.noarch",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "libomp-0:23.1.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "compiler-rt-0:23.1.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libomp-devel-0:23.1.4-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubygem-irb-0:1.16.0-40.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubygem-rbs-0:3.10.0-40.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "rubygem-json-0:2.21.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "erlang-srpm-macros-0:0.4.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "meson-srpm-macros-0:1.12.1-2.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "pyproject-srpm-macros-0:1.24.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "plasma-activities-0:6.8.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "plasma-activities-stats-0:6.8.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "signon-plugin-oauth2-0:0.25^20231216.fab6988-8.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "signon-0:8.60^20240205.c8ad982-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "signon-kwallet-extension-0:26.08.2-1.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "catdoc-wordview-0:0.95-31.fc45.x86_64",
+        "action": "Install",
+        "reason": "Weak Dependency",
+        "repository": "fedora"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "command": "dnf install git cmake ninja-build gcc-c++ extra-cmake-modules pkgconf-pkg-config",
+    "packages": [
+      {
+        "nevra": "ninja-build-0:1.13.2-6.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "extra-cmake-modules-0:6.31.0-1.fc45.noarch",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cmake-0:4.3.0-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "cmake-data-0:4.3.0-5.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "jsoncpp-0:1.9.6-3.fc44.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "make-1:4.4.1-13.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "rhash-0:1.4.5-5.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "gcc-c++-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "User",
+        "repository": "updates"
+      },
+      {
+        "nevra": "gcc-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libstdc++-devel-0:16.2.1-3.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "glibc-devel-0:2.44-2.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "libxcrypt-devel-0:4.5.2-4.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      },
+      {
+        "nevra": "vim-filesystem-2:9.2.1202-1.fc45.noarch",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "updates"
+      },
+      {
+        "nevra": "kernel-headers-0:7.2.4-300.fc45.x86_64",
+        "action": "Install",
+        "reason": "Dependency",
+        "repository": "fedora"
+      }
+    ]
+  }
+]
